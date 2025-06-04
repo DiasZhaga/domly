@@ -3,11 +3,12 @@ package handlers
 import (
 	"diplom/internal/common"
 	"diplom/internal/domain/models"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"net/http"
-	"time"
 )
 
 func (h *Handler) Register(c *gin.Context) {
@@ -83,55 +84,54 @@ func (h *Handler) Register(c *gin.Context) {
 }
 
 func (h *Handler) Login(c *gin.Context) {
-    ctx := c.Request.Context()
+	ctx := c.Request.Context()
 
-    login := c.Request.FormValue("login")
-    password := c.Request.FormValue("password")
+	login := c.Request.FormValue("login")
+	password := c.Request.FormValue("password")
 
-    // 1) Получаем id и сохранённый пароль
-    id, savedPass, err := h.majorRepository.GetPassInDb(ctx, login)
-    if err != nil {
-        zap.L().Error("get user data failed", zap.Error(err))
-        c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
-        return
-    }
-    if savedPass != password {
-        zap.L().Error("password is invalid")
-        c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{})
-        return
-    }
+	// 1) Получаем id и сохранённый пароль
+	id, savedPass, err := h.majorRepository.GetPassInDb(ctx, login)
+	if err != nil {
+		zap.L().Error("get user data failed", zap.Error(err))
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	if savedPass != password {
+		zap.L().Error("password is invalid")
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{})
+		return
+	}
 
-    // 2) Генерируем и сохраняем токен + куку
-    sessionToken := uuid.New().String()
-    if err = h.majorRepository.SaveCookieToken(ctx, id, sessionToken); err != nil {
-        zap.L().Error("save cookie token failed", zap.Error(err))
-        c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
-        return
-    }
-    c.SetCookie(
-        "session_token",
-        sessionToken,
-        common.TimeSession,
-        "/",
-        "",
-        false,
-        true,
-    )
+	// 2) Генерируем и сохраняем токен + куку
+	sessionToken := uuid.New().String()
+	if err = h.majorRepository.SaveCookieToken(ctx, id, sessionToken); err != nil {
+		zap.L().Error("save cookie token failed", zap.Error(err))
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	c.SetCookie(
+		"session_token",
+		sessionToken,
+		common.TimeSession,
+		"/",
+		"",
+		false,
+		true,
+	)
 
-    // 3) Достаём из БД полную модель пользователя
-    userModel, err := h.majorRepository.GetUserByID(ctx, id)
-    if err != nil {
-        zap.L().Error("get user by id failed", zap.Error(err))
-        c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
-        return
-    }
+	// 3) Достаём из БД полную модель пользователя
+	userModel, err := h.majorRepository.GetUserByID(ctx, id)
+	if err != nil {
+		zap.L().Error("get user by id failed", zap.Error(err))
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
 
-    // 4) Отдаём имя клиенту
-    c.JSON(http.StatusOK, gin.H{
-        "name": userModel.Name,
-    })
+	// 4) Отдаём имя клиенту
+	c.JSON(http.StatusOK, gin.H{
+		"name": userModel.Name,
+	})
 }
-
 
 func (h *Handler) Logout(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -142,6 +142,16 @@ func (h *Handler) Logout(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
 		return
 	}
+
+	c.SetCookie(
+		"session_token",
+		"",
+		-1,
+		"/",
+		"",
+		false,
+		true,
+	)
 	c.Status(http.StatusOK)
 }
 
@@ -177,32 +187,32 @@ func (h *Handler) AuthMiddleware(c *gin.Context) {
 }
 
 func (h *Handler) Me(c *gin.Context) {
-    ctx := c.Request.Context()
+	ctx := c.Request.Context()
 
-    // AuthMiddleware кладёт user_id в c.Set(common.KeySet, <int>)
-    // Поэтому здесь достаём его:
-    userID := c.GetInt(common.KeySet)
-    if userID == 0 {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "not authorized"})
-        return
-    }
+	// AuthMiddleware кладёт user_id в c.Set(common.KeySet, <int>)
+	// Поэтому здесь достаём его:
+	userID := c.GetInt(common.KeySet)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authorized"})
+		return
+	}
 
-    // Вызываем именно MajorRepository.GetUserByID:
-    user, err := h.majorRepository.GetUserByID(ctx, userID)
-    if err != nil {
-        zap.L().Error("failed to fetch user", zap.Error(err))
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user"})
-        return
-    }
+	// Вызываем именно MajorRepository.GetUserByID:
+	user, err := h.majorRepository.GetUserByID(ctx, userID)
+	if err != nil {
+		zap.L().Error("failed to fetch user", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user"})
+		return
+	}
 
-    // Возвращаем JSON с публичными полями:
-    c.JSON(http.StatusOK, gin.H{
-        "id":           user.ID,
-        "name":         user.Name,
-        "email":        user.Login,       // если login хранит email/телефон
-        "balance":      user.Balance,
-        "isSubscribed": user.Subscribe,
-        "createdAt":    user.CreatedAt,   // при желании
-        // "stopedAt": user.StopedAt,      // если захотите вернуть
-    })
+	// Возвращаем JSON с публичными полями:
+	c.JSON(http.StatusOK, gin.H{
+		"id":           user.ID,
+		"name":         user.Name,
+		"email":        user.Login, // если login хранит email/телефон
+		"balance":      user.Balance,
+		"isSubscribed": user.Subscribe,
+		"createdAt":    user.CreatedAt, // при желании
+		// "stopedAt": user.StopedAt,      // если захотите вернуть
+	})
 }
