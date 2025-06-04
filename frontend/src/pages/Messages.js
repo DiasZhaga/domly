@@ -1,19 +1,24 @@
 // src/pages/Messages.js
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import Layout from "../components/Layout";
+import { useAuth } from "../components/AuthContext";
 import "../assets/css/style.css";
 
 export default function Messages() {
-  // две вкладки: обычные чаты и девелоперы
   const [activeTab, setActiveTab] = useState("chats");
+  const { user } = useAuth();
+  const currentUserId = user?.id;
 
-  // список разговоров
+  const [dialogs, setDialogs] = useState([]);
+  const [activeConv, setActiveConv] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const socketRef = useRef(null);
+  const [searchParams] = useSearchParams();
+  const user2FromUrl = searchParams.get("user2");
+
   const mockConversations = {
-    chats: [
-      { id: 1, title: "Abylai" },
-      { id: 2, title: "Bekzat" },
-      { id: 3, title: "Saule" },
-    ],
     developers: [
       { id: 101, title: "BI Group" },
       { id: 102, title: "BAZIS" },
@@ -21,32 +26,8 @@ export default function Messages() {
     ],
   };
 
-  // история сообщений по каждому чату (с полем time)
   const mockMessages = {
-    1: [
-      {
-        fromMe: false,
-        text: "Hi, I'm interested in buying the apartment at Kayim M., 12/3, apt 4.",
-        time: "10:00",
-      },
-      {
-        fromMe: true,
-        text: "Hello Abylai, it’s still available. Would you like to proceed with the purchase?",
-        time: "10:02",
-      },
-      {
-        fromMe: false,
-        text: "Yes, I’d like to complete the purchase. What are the next steps?",
-        time: "10:05",
-      },
-      {
-        fromMe: true,
-        text: "Great! I’ll send you the contract details and payment link shortly.",
-        time: "10:07",
-      },
-    ],
     102: [
-      // пример для BAZIS
       {
         fromMe: true,
         text: "Hello BAZIS — do you have units available in Alatau?",
@@ -58,131 +39,206 @@ export default function Messages() {
         time: "09:32",
       },
     ],
-    // остальные можно добавить по аналогии...
   };
 
-  const [activeConv, setActiveConv] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
+  useEffect(() => {
+    if (!currentUserId) return;
+    const ws = new WebSocket(`ws://localhost:8080/api/v1/talk/ws?user_id=${currentUserId}`);
+    socketRef.current = ws;
 
-  const selectChat = (id) => {
-    setActiveConv(id);
-    setMessages(mockMessages[id] || []);
+    ws.onopen = () => console.log("WebSocket connected");
+    ws.onclose = () => console.log("WebSocket disconnected");
+    ws.onerror = (err) => console.error("WebSocket error:", err);
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "message") {
+          if (msg.from === activeConv || msg.to === activeConv) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                fromMe: msg.from === currentUserId,
+                text: msg.content,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              },
+            ]);
+          }
+        }
+      } catch (err) {
+        console.error("Invalid WebSocket message:", e.data);
+      }
+    };
+
+    return () => ws.close();
+  }, [currentUserId, activeConv]);
+
+  useEffect(() => {
+    fetch("/api/v1/talk/dialogs", { credentials: "include" })
+      .then((res) => res.text())
+      .then((text) => {
+        try {
+          const data = JSON.parse(text);
+          const list = Array.isArray(data) ? data : data.dialogs || [];
+          setDialogs(list);
+        } catch (err) {
+          console.error("Invalid JSON from /api/v1/talk/dialogs:", text);
+          setDialogs([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load dialogs:", err);
+        setDialogs([]);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (user2FromUrl) {
+      const user2Id = Number(user2FromUrl);
+      if (!activeConv || activeConv !== user2Id) {
+        setActiveConv(user2Id);
+        if (activeTab === "developers" && mockMessages[user2Id]) {
+          setMessages(mockMessages[user2Id]);
+        } else {
+          fetch(`/api/v1/talk/messages/history?user2=${user2Id}`, {
+            credentials: "include",
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              const formatted = (Array.isArray(data) ? data : []).map((m) => ({
+                fromMe: m.sender_id === currentUserId,
+                text: m.content,
+                time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""
+              }));
+              setMessages(formatted);
+            })
+            .catch(() => {
+              console.error("No prior conversation. Starting new chat.");
+              setMessages([]);
+            });
+        }
+      }
+    }
+  }, [user2FromUrl, currentUserId, activeConv]);
+
+  const selectChat = async (user2) => {
+    setActiveConv(user2);
+    if (activeTab === "developers" && mockMessages[user2]) {
+      setMessages(mockMessages[user2]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v1/talk/messages/history?user2=${user2}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      const formatted = (Array.isArray(data) ? data : []).map((m) => ({
+        fromMe: m.sender_id === currentUserId,
+        text: m.content,
+        time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""
+      }));
+      setMessages(formatted);
+    } catch (err) {
+      console.error("Failed to load messages:", err);
+      setMessages([]);
+    }
   };
 
   const sendMessage = () => {
-    if (!input.trim() || !activeConv) return;
-    const newMsg = { fromMe: true, text: input.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    setMessages((msgs) => [...msgs, newMsg]);
+    if (!input.trim() || !activeConv || !socketRef.current) return;
+    socketRef.current.send(JSON.stringify({ to: activeConv, content: input }));
     setInput("");
   };
 
+  const activeList = activeTab === "developers"
+    ? mockConversations.developers
+    : dialogs.map((d) => ({ id: d.user_id, title: d.name, last_message: d.last_message }));
+
+  if (!currentUserId) return <div className="text-center p-5">Loading user...</div>;
+
   return (
     <Layout>
-      <div className="header-section bg-white">
-        <div className="container-fluid p-0 bg-light">
-          <div className="page-content">
-            <div className="container py-5 mt-5">
-              <div className="row gx-0">
-                {/* Sidebar с вкладками и списком чатов */}
-                <div className="col-md-4 pe-3">
-                  <ul className="nav nav-tabs mb-3">
-                    <li className="nav-item">
-                      <button
-                        className={`nav-link ${activeTab === "chats" ? "active" : ""}`}
-                        onClick={() => {
-                          setActiveTab("chats");
-                          setActiveConv(null);
-                        }}
-                      >
-                        Chats
-                      </button>
+      <div className="container-fluid p-0 bg-light">
+        <div className="page-content">
+          <div className="container py-5 mt-5">
+            <div className="row gx-0">
+              <div className="col-md-4 pe-3">
+                <ul className="nav nav-tabs mb-3">
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link ${activeTab === "chats" ? "active" : ""}`}
+                      onClick={() => {
+                        setActiveTab("chats");
+                        setActiveConv(null);
+                        setMessages([]);
+                      }}
+                    >Chats</button>
+                  </li>
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link ${activeTab === "developers" ? "active" : ""}`}
+                      onClick={() => {
+                        setActiveTab("developers");
+                        setActiveConv(null);
+                        setMessages([]);
+                      }}
+                    >Developers</button>
+                  </li>
+                </ul>
+                <ul className="list-group" style={{ maxHeight: "65vh", overflowY: "auto" }}>
+                  {activeList.map((conv) => (
+                    <li
+                      key={conv.id}
+                      className={`list-group-item ${activeConv === conv.id ? "active text-white" : ""}`}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => selectChat(conv.id)}
+                    >
+                      <div className="fw-semibold">{conv.title}</div>
+                      {conv.last_message && <div className="text-muted small">{conv.last_message}</div>}
                     </li>
-                    <li className="nav-item">
-                      <button
-                        className={`nav-link ${activeTab === "developers" ? "active" : ""}`}
-                        onClick={() => {
-                          setActiveTab("developers");
-                          setActiveConv(null);
-                        }}
-                      >
-                        Developers
-                      </button>
-                    </li>
-                  </ul>
-
-                  <ul className="list-group" style={{ maxHeight: "65vh", overflowY: "auto" }}>
-                    {mockConversations[activeTab].map((conv) => (
-                      <li
-                        key={conv.id}
-                        className={`list-group-item ${
-                          activeConv === conv.id ? "active text-white" : ""
-                        }`}
-                        style={{ cursor: "pointer" }}
-                        onClick={() => selectChat(conv.id)}
-                      >
-                        {conv.title}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Панель сообщений */}
-                <div className="col-md-8 d-flex flex-column" style={{ height: "75vh" }}>
-                  {activeConv ? (
-                    <>
-                      <div
-                        className="flex-grow-1 p-3 overflow-auto bg-white"
-                        style={{ borderRadius: "0.5rem 0.5rem 0 0" }}
-                      >
-                        {messages.map((m, i) => (
+                  ))}
+                </ul>
+              </div>
+              <div className="col-md-8 d-flex flex-column" style={{ height: "75vh" }}>
+                {activeConv ? (
+                  <>
+                    <div className="flex-grow-1 p-3 overflow-auto bg-white" style={{ borderRadius: "0.5rem 0.5rem 0 0" }}>
+                      {messages.map((m, i) => (
+                        <div key={i} className={`mb-2 d-flex ${m.fromMe ? "justify-content-end" : ""}`}>
                           <div
-                            key={i}
-                            className={`mb-2 d-flex ${m.fromMe ? "justify-content-end" : ""}`}
+                            className={`p-2 rounded ${m.fromMe ? "bg-primary text-white" : "bg-light"}`}
+                            style={{ maxWidth: "70%", position: "relative" }}
                           >
-                            <div
-                              className={`p-2 rounded ${
-                                m.fromMe ? "bg-primary text-white" : "bg-light"
-                              }`}
-                              style={{ maxWidth: "70%", position: "relative" }}
-                            >
-                              {m.text}
+                            {m.text}
+                            {m.time && (
                               <small
-                                className={`position-absolute text-muted`}
-                                style={{
-                                  fontSize: "0.7rem",
-                                  bottom: "-1.2rem",
-                                  right: m.fromMe ? "0" : "auto",
-                                  left: m.fromMe ? "auto" : "0",
-                                }}
+                                className="position-absolute text-muted"
+                                style={{ fontSize: "0.7rem", bottom: "-1.2rem", right: m.fromMe ? "0" : "auto", left: m.fromMe ? "auto" : "0" }}
                               >
                                 {m.time}
                               </small>
-                            </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
-
-                      <div className="input-group mt-3">
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="Type a message..."
-                          value={input}
-                          onChange={(e) => setInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                        />
-                        <button className="btn btn-primary" onClick={sendMessage}>
-                          Send
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="d-flex align-items-center justify-content-center h-100 text-muted">
-                      Select a conversation
+                        </div>
+                      ))}
                     </div>
-                  )}
-                </div>
+                    <div className="input-group mt-3">
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Type a message..."
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                      />
+                      <button className="btn btn-primary" onClick={sendMessage}>Send</button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="d-flex align-items-center justify-content-center h-100 text-muted">
+                    Select a conversation
+                  </div>
+                )}
               </div>
             </div>
           </div>
