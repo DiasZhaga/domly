@@ -1,0 +1,50 @@
+package handlers
+
+import (
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+	"net/http"
+	"strconv"
+)
+
+func (h *Handler) AddComment(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	userId := c.GetInt("user_id")
+	appartId, _ := strconv.Atoi(c.Param("id"))
+	comment := c.Query("comment")
+
+	if err := h.contentRepository.AddComment(ctx, userId, appartId, comment); err != nil {
+		zap.L().Error("Adding comment failed", zap.Error(err))
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.Status(http.StatusOK)
+}
+
+//func (h *Handler) GetAllCommentByAppart(c *gin.Context) {
+//	ctx := c.Request.Context()
+//
+//	appartId, _ := strconv.Atoi(c.Param("id"))
+//	comments, err := h.contentRepository.GetAllComment(ctx, appartId)
+//	if err != nil {
+//		zap.L().Error("Getting all comment failed", zap.Error(err))
+//		c.AbortWithStatus(http.StatusInternalServerError)
+//		return
+//	}
+//	c.JSON(http.StatusOK, comments)
+//}
+
+func (h *Handler) DelComment(c *gin.Context) {
+	ctx := c.Request.Context()
+	userId := c.GetInt("user_id")
+
+	commId, _ := strconv.Atoi(c.Param("id"))
+
+	if err := h.contentRepository.DelComment(ctx, userId, commId); err != nil {
+		zap.L().Error("Adding comment failed", zap.Error(err))
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.Status(http.StatusOK)
+}
