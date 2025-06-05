@@ -203,7 +203,7 @@ const (
 		FROM messages
 		WHERE (sender_id = $1 AND receiver_id = $2)
 		   OR (sender_id = $2 AND receiver_id = $1)
-		ORDER BY created_at DESC
+		ORDER BY created_at
 		LIMIT $3 OFFSET $4;
 	`
 
@@ -313,7 +313,7 @@ const (
         FROM public.appartments
         WHERE district_id = $1
     `
-    getApartmentByIDQuery = `
+	getApartmentByIDQuery = `
         SELECT 
             id,
             name,
@@ -353,8 +353,8 @@ const (
       FROM photos
       WHERE ad_id = $1
       ORDER BY sort_index`
-      
-    sqlInsertPhoto = `
+
+	sqlInsertPhoto = `
       INSERT INTO photos (ad_id, url, main_url, sort_index)
       VALUES (
         $1, $2, $3,
@@ -362,11 +362,11 @@ const (
       )
       RETURNING id, url, main_url, sort_index
     `
-    
-    sqlDeletePhoto = `DELETE FROM photos WHERE ad_id=$1 AND id=$2`
 
-    // Обновляем сразу sort_index и флаг main_url
-    sqlUpdatePhoto = `
+	sqlDeletePhoto = `DELETE FROM photos WHERE ad_id=$1 AND id=$2`
+
+	// Обновляем сразу sort_index и флаг main_url
+	sqlUpdatePhoto = `
       UPDATE photos
          SET sort_index = $1
            , main_url    = $2
@@ -410,7 +410,7 @@ const (
 			WHERE s.id = $2
 		)
 		WHERE id = $1;`
-			canceledBuyQuery = `
+	canceledBuyQuery = `
 			UPDATE sales
 			SET purchase_canceled = true
 			WHERE id = $1;

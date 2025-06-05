@@ -23,13 +23,15 @@ VALUES
 (2,'Nauryzbai District'),
 (2,'Turksib District');
 
-INSERT INTO public.auth_users (login,pass,"name",created_at)
+INSERT INTO public.auth_users (id, login, pass, "name", created_at, subscribe, stoped_at, balance)
 VALUES
-('test2@gmail.com','Test1234','Tester','2025-05-17 19:03:58.319882+05'),
-('77083221488','#Xavisimons123','Simons','2025-05-18 13:33:47.460753+05'),
-('77085414352','#Xavisimons123','Deco','2025-05-18 13:36:30.705803+05'),
-('77014333412','#Wewerkj12','Soucek','2025-05-18 14:37:31.013773+05'),
-('andrew.colwill@gmail.com','#Qwerty123','Andrew','2025-05-18 21:22:28.274471+05');
+(1, 'test2@gmail.com', 'Test1234', 'Tester', '2025-05-17 14:03:58.319882+00', true, NULL, 0.00),
+(2, '77083221488', '#Xavisimons123', 'Simons', '2025-05-18 08:33:47.460753+00', false, NULL, 0.00),
+(3, '77085414352', '#Xavisimons123', 'Deco', '2025-05-18 08:36:30.705803+00', false, NULL, 0.00),
+(4, '77014333412', '#Wewerkj12', 'Soucek', '2025-05-18 09:37:31.013773+00', false, NULL, 0.00),
+(5, 'andrew.colwill@gmail.com', '#Qwerty123', 'Andrew', '2025-05-18 16:22:28.274471+00', false, NULL, 0.00),
+(6, 'limilia248@gmail.com', 'f@q%LYKVXa8fj]g', 'iliya', '2025-06-04 08:09:09.498531+00', true, NULL, 0.00);
+
 
 
 INSERT INTO public.ads
@@ -67,3 +69,37 @@ VALUES
 ('Altyn Shar','Business-class high-rise offering spacious units, granite facades, and panoramic windows.','59 Kabanbai Batyr Avenue, Nury District, Astana','9-16 floors','Business','Underground','Granite-clad exterior; Floor-to-ceiling windows; Exclusive lobby','24/7 security; On-site café; Valet parking','Great transport links; High-quality finishes; Attentive staff',4);
 
 
+INSERT INTO public.messages (sender_id, receiver_id, content, created_at)
+VALUES
+(6, 3, 'hello! I''d like to buy your house', '2025-06-04 08:55:48.43005+00'),
+(6, 3, 'test', '2025-06-04 08:59:22.225175+00'),
+(6, 1, 'test', '2025-06-04 09:00:00.472502+00'),
+(1, 6, 'good', '2025-06-04 09:01:11.625845+00'),
+(6, 1, 'test ws', '2025-06-04 09:03:40.538365+00'),
+(1, 6, 'chat check', '2025-06-04 09:18:02.626364+00'),
+(6, 1, 'copy', '2025-06-04 09:18:14.468139+00'),
+(1, 3, 'hello', '2025-06-04 09:18:42.494264+00');
+
+INSERT INTO public.developers (name, description, phone, email, logo_url)
+VALUES
+(
+  'BI Group',
+  'Leading Kazakh developer known for large-scale residential and commercial projects.',
+  '+7 (7172) 79-99-99',
+  'contact@bi-group.kz',
+  'https://example.com/logos/bi-group.png'
+),
+(
+  'BAZIS',
+  'One of the oldest and most trusted developers in Kazakhstan, operating since 1991.',
+  '+7 (727) 258-36-00',
+  'info@bazis.kz',
+  'https://example.com/logos/bazis.png'
+),
+(
+  'Ulytau Group',
+  'Emerging real estate group focusing on premium housing complexes in Astana and Almaty.',
+  '+7 (700) 123-45-67',
+  'sales@ulytau.kz',
+  'https://example.com/logos/ulytau.png'
+);

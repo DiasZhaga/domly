@@ -53,6 +53,12 @@ const PropertyDetails = () => {
     p.url.startsWith("http") ? p.url : `/ads-photos/${p.url}`
   );
 
+  const startChat = () => {
+    if (ad.author?.id) {
+      navigate(`/messages?user2=${ad.author.id}`);
+    }
+  };
+
   // Основная функция: выполняем покупку
   const performPurchase = async () => {
     // 1) Проверяем авторизацию
@@ -170,7 +176,7 @@ const PropertyDetails = () => {
                     <div className="d-flex flex-column mt-4">
                       <button
                         className="btn btn-outline-primary mb-2"
-                        onClick={() => navigate("/messages")}
+                        onClick={startChat}
                       >
                         Send Message
                       </button>
