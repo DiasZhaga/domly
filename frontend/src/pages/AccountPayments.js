@@ -6,15 +6,17 @@ import { useAuth } from "../components/AuthContext";
 import AddFundsModal from "../components/AddFundsModal";
 import { FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 
+// PurchaseConfirmation теперь НЕ содержит <Layout>, а только внутренний контейнер
+import PurchaseConfirmation from "./PurchaseConfirmation";
+
 const AccountPayments = () => {
   const { user, setUser, loading } = useAuth();
   const [showModal, setShowModal] = useState(false);
 
-  // Баннера для успеха/ошибки
+  // Баннеры об успехе/ошибке пополнения
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Если /auth/me ещё в процессе
   if (loading) {
     return (
       <Layout>
@@ -25,7 +27,6 @@ const AccountPayments = () => {
     );
   }
 
-  // Если не залогинен
   if (!user) {
     return (
       <Layout>
@@ -38,20 +39,16 @@ const AccountPayments = () => {
 
   const balanceToShow = user.balance ?? 0;
 
-  // Первый вызов onSuccess (без баланса) – просто закрывает модалку и ставит сообщение
-  // Второй вызов onSuccess со значением newBalance → обновит контекст
   const handleAddFundsSuccess = (newBalance, isSubscribed = null) => {
-    // Если newBalance передали – обновляем контекст
     if (typeof newBalance === "number") {
-      setUser({ ...user, balance: newBalance, isSubscribed: isSubscribed ?? user.isSubscribed });
+      setUser({
+        ...user,
+        balance: newBalance,
+        isSubscribed: isSubscribed ?? user.isSubscribed,
+      });
     }
-
-    // Закрываем модалку, если она ещё открыта
     setShowModal(false);
-
-    // Показываем зелёный баннер
     setSuccessMsg("Account topped up successfully");
-    // Скрываем через 3 секунды
     setTimeout(() => setSuccessMsg(""), 3000);
   };
 
@@ -64,14 +61,13 @@ const AccountPayments = () => {
     <Layout>
       <div className="header-section bg-white">
         <div className="container py-5">
-          {/* Зелёный баннер об успехе */}
+          {/* Баннеры об успехе/ошибке пополнения */}
           {successMsg && (
             <div className="alert alert-success d-flex align-items-center" role="alert">
               <FaCheckCircle className="me-2" />
               {successMsg}
             </div>
           )}
-          {/* Красный баннер об ошибке */}
           {errorMsg && (
             <div className="alert alert-danger d-flex align-items-center" role="alert">
               <FaTimesCircle className="me-2" />
@@ -86,7 +82,6 @@ const AccountPayments = () => {
                 <button
                   className="btn btn-success"
                   onClick={() => {
-                    // Перед открытием модалки сбросим все старые сообщения
                     setErrorMsg("");
                     setSuccessMsg("");
                     setShowModal(true);
@@ -106,9 +101,7 @@ const AccountPayments = () => {
               <div className="row text-center">
                 <div className="col">
                   <h6>Account Balance</h6>
-                  <p className="h5 text-success">
-                    ₸{balanceToShow.toLocaleString()}
-                  </p>
+                  <p className="h5 text-success">₸{balanceToShow.toLocaleString()}</p>
                 </div>
                 <div className="col">
                   <h6>Subscription Status</h6>
@@ -118,24 +111,8 @@ const AccountPayments = () => {
             </div>
           </div>
 
-          {/* Заглушка Payment History */}
-          <h5 className="mb-3">Payment History</h5>
-          <div className="list-group mb-5">
-            <div className="list-group-item d-flex justify-content-between align-items-center" key={1}>
-              <div>
-                <div className="fw-semibold">2025-05-28</div>
-                <div className="text-muted">Domly Plus Subscription</div>
-              </div>
-              <div className="fw-bold">₸8 000</div>
-            </div>
-            <div className="list-group-item d-flex justify-content-between align-items-center" key={2}>
-              <div>
-                <div className="fw-semibold">2025-04-15</div>
-                <div className="text-muted">Domly Ultra 6-month Subscription</div>
-              </div>
-              <div className="fw-bold">₸30 000</div>
-            </div>
-          </div>
+          {/*  Здесь мы рендерим PurchaseConfirmation вместо Payment History  */}
+          <PurchaseConfirmation />
         </div>
       </div>
 

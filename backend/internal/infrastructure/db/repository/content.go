@@ -1105,7 +1105,7 @@ func (c *ContentRepository) ProofOfPurchase(ctx context.Context, userId int, sta
 			zap.L().Error("Failed when requesting the proofOfPurchase", zap.Error(err))
 			return err
 		}
-		sumWithPrecent := sum - sum*0.0003
+		sumWithPrecent := sum - sum*0.003
 		if _, err := tx.ExecContext(dbCtx, addingBalanceOfSeller, sumWithPrecent, sellerId); err != nil {
 			zap.L().Error("Failed when changing proofOfPurchase", zap.Error(err))
 			return err
