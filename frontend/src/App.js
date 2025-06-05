@@ -18,6 +18,7 @@ import Messages from "./pages/Messages";
 import EditAdPage from "./pages/EditAd";
 import EditPhotosPage from "./pages/EditPhotosPage";
 import AccountPayments from "./pages/AccountPayments";
+import PurchaseConfirmation from "./pages/PurchaseConfirmation";
 
 const App = () => {
   const [loading, setLoading]   = useState(true);
@@ -64,6 +65,7 @@ const App = () => {
           <Route path="/messages" element={<Messages />} />
           <Route path="/edit-photos/:id" element={<EditPhotosPage />} />
           <Route path="/account-payments" element={<AccountPayments />} />
+          <Route path="/purchase-confirmation" element={<PurchaseConfirmation />} />
           {/* TODO: edit-ad and 404 routes */}
         </Routes>
 
