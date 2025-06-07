@@ -50,6 +50,13 @@ CREATE TABLE public.developers (
 );
 
 
+CREATE TABLE public.banks (
+  id serial4 NOT NULL,
+  "name" varchar(255) NOT NULL,
+  CONSTRAINT banks_pkey PRIMARY KEY (id)
+);
+
+
 -- public.ads definition
 
 -- Drop table
@@ -57,29 +64,34 @@ CREATE TABLE public.developers (
 -- DROP TABLE public.ads;
 
 CREATE TABLE public.ads (
-	id serial4 NOT NULL,
-	title text NOT NULL,
-	name_appartment text NOT NULL,
-	square int4 NOT NULL,
-	num_rooms int4 NOT NULL,
-	floor int4 NOT NULL,
-	year_construction int4 NOT NULL,
-	address text NOT NULL,
-	price int4 NOT NULL,
-	ceiling_height int4 NOT NULL,
-	description text NULL,
-	created_at timestamptz DEFAULT now() NOT NULL,
-	author_id int4 NOT NULL,
-	ads_type int4 NOT NULL,
-	is_active bool NOT NULL,
-	stoped_at timestamptz NOT NULL,
-	city text NOT NULL,
-	district text NOT NULL,
-	pledge bool NOT NULL,
-	bank bool DEFAULT false NOT NULL,
-	CONSTRAINT ads_pkey PRIMARY KEY (id),
-	CONSTRAINT ads_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.auth_users(id)
+  id serial4 NOT NULL,
+  title text NOT NULL,
+  name_appartment text NOT NULL,
+  square int4 NOT NULL,
+  num_rooms int4 NOT NULL,
+  floor int4 NOT NULL,
+  year_construction int4 NOT NULL,
+  address text NOT NULL,
+  price int4 NOT NULL,
+  ceiling_height int4 NOT NULL,
+  description text NULL,
+  created_at timestamptz DEFAULT now() NOT NULL,
+  author_id int4 NOT NULL,
+  ads_type int4 NOT NULL,
+  is_active bool NOT NULL,
+  stoped_at timestamptz NOT NULL,
+  city text NOT NULL,
+  district text NOT NULL,
+  pledge bool NOT NULL,
+  bank_id int4 NULL,
+  CONSTRAINT ads_pkey PRIMARY KEY (id)
 );
+
+
+-- public.ads foreign keys
+
+ALTER TABLE public.ads ADD CONSTRAINT ads_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.auth_users(id);
+ALTER TABLE public.ads ADD CONSTRAINT fk_ads_banks FOREIGN KEY (bank_id) REFERENCES public.banks(id);
 
 
 -- public.ads_photos definition
@@ -231,13 +243,6 @@ CREATE TABLE public."document" (
 
 ALTER TABLE public."document" ADD CONSTRAINT document_id_ads_fkey FOREIGN KEY (id_ads) REFERENCES public.ads(id) ON DELETE CASCADE;
 
-
-
-CREATE TABLE public.banks (
-	id serial4 NOT NULL,
-	"name" varchar(255) NOT NULL,
-	CONSTRAINT banks_pkey PRIMARY KEY (id)
-);
 
 
 -- public.type_ads definition

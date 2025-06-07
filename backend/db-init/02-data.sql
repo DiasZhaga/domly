@@ -3,6 +3,14 @@ VALUES
 ('Astana'),
 ('Almaty');
 
+INSERT INTO public.banks ("name") VALUES
+	 ('Kaspi'),
+	 ('Halyk'),
+	 ('Forte'),
+	 ('Freedom'),
+	 ('CenterCredit');
+
+
 INSERT INTO public.districts (city_id,"name")
 VALUES
 (1,'Almatinsky District'),
@@ -52,12 +60,12 @@ INSERT INTO public.ads
 	city,
 	district,
 	pledge,
-	bank
+	bank_id
 )
 VALUES
-('Asyl Park hata 69m sq','3',69,3,4,2021,'Manas St.',22000000,3,'fq34rv234t3bw34bw3b','2025-05-20 14:28:57.293312+05',1,1,true,'2025-06-19 14:28:57.292036+05','1','1',false,false),
-('Bi City Seoul','2',55,2,4,2019,'rvwqvwq3wwc',26000000,3,'rqv33v54t45btretundyuftumkiukgumkguoimgym','2025-05-20 16:46:37.296156+05',3,1,true,'2025-06-19 16:46:37.29553+05','1','4',false,false),
-('Altyn Shar, 1-room apartment ','5',38,1,4,2022,'Kayim Mukhamedkhanov, 12/3',25000000,3,'I will sell a studio apartment, warm and cozy. Not angular. With a fresh renovation. Do not disturb realtors!','2025-05-26 14:11:13.890549+05',5,1,true,'2025-06-25 14:11:13.888934+05','1','4',false,false);
+('Asyl Park hata 69m sq','3',69,3,4,2021,'Manas St.',22000000,3,'fq34rv234t3bw34bw3b','2025-05-20 14:28:57.293312+05',1,1,true,'2025-06-19 14:28:57.292036+05','1','1',false,1),
+('Bi City Seoul','2',55,2,4,2019,'rvwqvwq3wwc',26000000,3,'rqv33v54t45btretundyuftumkiukgumkguoimgym','2025-05-20 16:46:37.296156+05',3,1,true,'2025-06-19 16:46:37.29553+05','1','4',false,2),
+('Altyn Shar, 1-room apartment ','5',38,1,4,2022,'Kayim Mukhamedkhanov, 12/3',25000000,3,'I will sell a studio apartment, warm and cozy. Not angular. With a fresh renovation. Do not disturb realtors!','2025-05-26 14:11:13.890549+05',5,1,true,'2025-06-25 14:11:13.888934+05','1','4',false,3);
 
 
 INSERT INTO public.appartments("name",description,address,floors,"class",parking,peculiarities,residents_value,"comments",district_id)
