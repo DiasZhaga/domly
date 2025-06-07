@@ -36,24 +36,13 @@ const PropertyDetails = () => {
   const [infoModalData, setInfoModalData] = useState({ title: "", message: "" });
   const [showAddFunds, setShowAddFunds] = useState(false);
 
+  // Комментарии
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+
   const isGuest = !user;
   const needsSubscription = user && !user.isSubscribed;
 
-  // ---------------------------------
-  // 4. Моковые комментарии
-  // ---------------------------------
-  const comments = [
-    {
-      id: 1,
-      author: "Erzhan Zhumagaliev",
-      text: "Very friendly community, everything is near by, supermarket, laundry mats. Pharmacy and playground. Buss to the subway",
-      time: "just now",
-    },
-  ];
-
-  // ---------------------------------
-  // 5. Загрузка списка городов
-  // ---------------------------------
   useEffect(() => {
     fetch("/api/v1/locations/cities", { credentials: "include" })
       .then((res) => res.json())
@@ -62,10 +51,7 @@ const PropertyDetails = () => {
       })
       .catch(console.error);
   }, []);
-
-  // ---------------------------------
-  // 6. Загрузка самого объявления
-  // ---------------------------------
+  
   useEffect(() => {
     const loadAd = async () => {
       setLoading(true);
@@ -87,6 +73,45 @@ const PropertyDetails = () => {
     loadAd();
   }, [id]);
 
+  useEffect(() => {
+    if (ad?.id && !isGuest && !needsSubscription) {
+      fetch(`/api/v1/comments/${ad.id}`, { credentials: "include" })
+        .then((res) => res.json())
+        .then(data => setComments(Array.isArray(data) ? data : []))
+        .catch(() => setComments([]));
+    }
+  }, [ad, isGuest, needsSubscription]);
+
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+    try {
+      await fetch(`/api/v1/comments/${ad.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ comment: newComment }),
+      });
+      setNewComment("");
+      const res = await fetch(`/api/v1/comments/${ad.id}`, { credentials: "include" });
+      setComments(await res.json());
+    } catch (err) {
+      console.error("Failed to post comment", err);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    try {
+      await fetch(`/api/v1/comments/${commentId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const res = await fetch(`/api/v1/comments/${ad.id}`, { credentials: "include" });
+      setComments(await res.json());
+    } catch (err) {
+      console.error("Failed to delete comment", err);
+    }
+  };
+
   // ---------------------------------
   // 7. Когда объявление загружено, подгружаем районы для его города
   // ---------------------------------
@@ -105,9 +130,6 @@ const PropertyDetails = () => {
   if (error) return <p className="text-danger text-center py-5">{error.message}</p>;
   if (!ad) return <p className="text-center py-5">No data</p>;
 
-  // ---------------------------------
-  // 8. URL фотографий для PropertyGallery
-  // ---------------------------------
   const photoUrls = (ad.url_photos || []).map((p) =>
     p.url.startsWith("http") ? p.url : `/ads-photos/${p.url}`
   );
@@ -136,12 +158,12 @@ const PropertyDetails = () => {
   // ---------------------------------
   // 10. Функция покупки
   // ---------------------------------
+
   const performPurchase = async () => {
     if (!user) {
       setShowAuthModal(true);
       return;
     }
-
     const apartmentId = ad.id;
     const sellerId = ad.author.id;
     const sum = ad.price;
@@ -149,17 +171,13 @@ const PropertyDetails = () => {
     try {
       const res = await fetch(
         `/api/v1/content/ads/buy?apartment_id=${apartmentId}&seller_id=${sellerId}&sum=${sum}`,
-        {
-          method: "GET",
-          credentials: "include",
-        }
+        { method: "GET", credentials: "include" }
       );
 
       if (res.ok) {
         setInfoModalData({
           title: "Purchase Initiated",
-          message:
-            "Your purchase has been initiated! Please confirm this transaction within three days.",
+          message: "Your purchase has been initiated! Please confirm this transaction within three days.",
         });
         setShowInfoModal(true);
       } else {
@@ -176,10 +194,7 @@ const PropertyDetails = () => {
       }
     } catch (e) {
       console.error(e);
-      setInfoModalData({
-        title: "Network Error",
-        message: "Network error occurred. Please try again later.",
-      });
+      setInfoModalData({ title: "Network Error", message: "Network error occurred. Please try again later." });
       setShowInfoModal(true);
     }
   };
@@ -190,13 +205,7 @@ const PropertyDetails = () => {
         <div className="container-fluid p-0 bg-white">
           <div className="container py-5 mt-5">
             <div className="row g-5">
-              {/* Галерея */}
-              <PropertyGallery
-                thumbnails={photoUrls}
-                initialMain={photoUrls[0] || "/placeholder.png"}
-              />
-
-              {/* Детали & Автор */}
+              <PropertyGallery thumbnails={photoUrls} initialMain={photoUrls[0] || "/placeholder.png"} />
               <div className="col-lg-5">
                 <h1 className="fw-bold mb-3">{ad.title}</h1>
                 <h3 className="text-success mb-4">
@@ -219,64 +228,36 @@ const PropertyDetails = () => {
 
                 <div className="row">
                   <div className="col-sm-6">
-                    <p>
-                      <strong>Area:</strong> {ad.square} m²
-                    </p>
-                    <p>
-                      <strong>Rooms:</strong> {ad.num_rooms}
-                    </p>
-                    <p>
-                      <strong>Floor:</strong> {ad.floor}
-                    </p>
-                    <p>
-                      <strong>Ceiling height:</strong> {ad.ceiling_height} m
-                    </p>
+                    <p><strong>Area:</strong> {ad.square} m²</p>
+                    <p><strong>Rooms:</strong> {ad.num_rooms}</p>
+                    <p><strong>Floor:</strong> {ad.floor}</p>
+                    <p><strong>Ceiling height:</strong> {ad.ceiling_height} m</p>
                   </div>
                   <div className="col-sm-6">
-                    <p>
-                      <strong>Year built:</strong> {ad.year_construction}
-                    </p>
-                    <p>
-                      <strong>Type:</strong> {ad.ads_type === "1" ? "For Sell" : "For Rent"}
-                    </p>
+                    <p><strong>Year built:</strong> {ad.year_construction}</p>
+                    <p><strong>Type:</strong> {ad.ads_type === "1" ? "For Sell" : "For Rent"}</p>
                   </div>
                 </div>
 
-                {/* Карточка автора (если залогинен) */}
                 {user && (
                   <div className="card border-0 shadow-sm p-4 mt-4">
                     <h5 className="mb-3">Author of the ad</h5>
                     <div className="d-flex align-items-center">
-                      <i
-                        className="fa fa-user-circle fa-2x me-3"
-                        style={{ color: "var(--primary)" }}
-                      />
+                      <i className="fa fa-user-circle fa-2x me-3" style={{ color: "var(--primary)" }} />
                       <div>
                         <p className="mb-1 fw-semibold">{ad.author.name}</p>
                         <p className="text-muted mb-0">{ad.author.login}</p>
                       </div>
                     </div>
                     <div className="d-flex flex-column mt-4">
-                      <button
-                        className="btn btn-outline-primary mb-2"
-                        onClick={startChat}
-                      >
-                        Send Message
-                      </button>
-                      <button
-                        className="btn w-100 text-primary"
-                        style={{ backgroundColor: "#e6f7ff" }}
-                        onClick={() => setShowConfirmModal(true)}
-                      >
-                        Make a purchase
-                      </button>
+                      <button className="btn btn-outline-primary mb-2" onClick={startChat}>Send Message</button>
+                      <button className="btn w-100 text-primary" style={{ backgroundColor: "#e6f7ff" }} onClick={() => setShowConfirmModal(true)}>Make a purchase</button>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Описание & Комментарии */}
             <div className="row mt-5">
               <div className="col-12">
                 <h4>Description</h4>
@@ -289,11 +270,24 @@ const PropertyDetails = () => {
                       className="form-control mb-3"
                       placeholder="Add comment..."
                       rows={3}
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
                     />
-                    {comments.map((c) => (
-                      <div key={c.id} className="mb-3">
-                        <strong>{c.author}</strong> <small className="text-muted">{c.time}</small>
-                        <p className="mb-1">{c.text}</p>
+                    <button className="btn btn-primary mb-4" onClick={handleAddComment}>Submit</button>
+                    {comments.map((c, i) => (
+                      <div key={i} className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center">
+                          <strong>{c.username}</strong>
+                          {user?.id === c.user_id && (
+                            <button
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleDeleteComment(c.id)}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                        <p className="mb-1">{c.comment}</p>
                         <hr />
                       </div>
                     ))}
@@ -301,16 +295,11 @@ const PropertyDetails = () => {
                 ) : (
                   <div className="blurred-box">
                     <div className="blurred-text">
-                      <textarea
-                        className="form-control mb-3"
-                        placeholder="Add comment..."
-                        rows={3}
-                        disabled
-                      />
-                      {comments.map((c) => (
-                        <div key={c.id} className="mb-3">
-                          <strong>{c.author}</strong> <small className="text-muted">{c.time}</small>
-                          <p className="mb-1">{c.text}</p>
+                      <textarea className="form-control mb-3" placeholder="Add comment..." rows={3} disabled />
+                      {comments.map((c, i) => (
+                        <div key={i} className="mb-3">
+                          <strong>{c.username}</strong>
+                          <p className="mb-1">{c.comment}</p>
                           <hr />
                         </div>
                       ))}
@@ -319,23 +308,15 @@ const PropertyDetails = () => {
                       {isGuest && (
                         <>
                           <p className="mb-3">Please register to view and add comments.</p>
-                          <button
-                            className="btn btn-success"
-                            onClick={() => setShowAuthModal(true)}
-                          >
-                            Register
-                          </button>
+                          <button className="btn btn-success" onClick={() => setShowAuthModal(true)}>Register</button>
                         </>
                       )}
                       {needsSubscription && (
                         <>
                           <p className="mb-3">Purchase a subscription to see comments.</p>
-                          <button
-                            className="btn btn-success"
+                          <button className="btn btn-success" 
                             onClick={() => navigate("/subscribe")}
-                          >
-                            Buy Premium
-                          </button>
+                          >Buy Premium</button>
                         </>
                       )}
                     </div>
@@ -347,12 +328,10 @@ const PropertyDetails = () => {
         </div>
       </div>
 
-      {/* Модалка авторизации (если гость) */}
       {showAuthModal && (
         <SignInModal onClose={() => setShowAuthModal(false)} initialTab="register" />
       )}
 
-      {/* Модалка подтверждения перед fetch("/ads/buy") */}
       {showConfirmModal && (
         <ConfirmModal
           title="Are you sure you want to make this purchase?"
@@ -367,7 +346,6 @@ const PropertyDetails = () => {
         />
       )}
 
-      {/* Информационная модалка (после performPurchase) */}
       {showInfoModal && (
         <InfoModal
           title={infoModalData.title}
@@ -381,12 +359,10 @@ const PropertyDetails = () => {
         />
       )}
 
-      {/* Если недостаточно средств, открываем AddFundsModal */}
       {showAddFunds && (
         <AddFundsModal
           userId={user.id}
           onSuccess={(newBalance, isSubscribed) => {
-            // при необходимости можно обновить контекст user
             setShowAddFunds(false);
           }}
           onError={(msg) => {

@@ -1,10 +1,11 @@
 package handlers
 
 import (
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 func (h *Handler) AddComment(c *gin.Context) {
@@ -12,9 +13,15 @@ func (h *Handler) AddComment(c *gin.Context) {
 
 	userId := c.GetInt("user_id")
 	appartId, _ := strconv.Atoi(c.Param("id"))
-	comment := c.Query("comment")
+	var req struct {
+		Comment string `json:"comment"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
 
-	if err := h.contentRepository.AddComment(ctx, userId, appartId, comment); err != nil {
+	if err := h.contentRepository.AddComment(ctx, userId, appartId, req.Comment); err != nil {
 		zap.L().Error("Adding comment failed", zap.Error(err))
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
@@ -22,18 +29,18 @@ func (h *Handler) AddComment(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-//func (h *Handler) GetAllCommentByAppart(c *gin.Context) {
-//	ctx := c.Request.Context()
-//
-//	appartId, _ := strconv.Atoi(c.Param("id"))
-//	comments, err := h.contentRepository.GetAllComment(ctx, appartId)
-//	if err != nil {
-//		zap.L().Error("Getting all comment failed", zap.Error(err))
-//		c.AbortWithStatus(http.StatusInternalServerError)
-//		return
-//	}
-//	c.JSON(http.StatusOK, comments)
-//}
+func (h *Handler) GetAllCommentByAppart(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	appartId, _ := strconv.Atoi(c.Param("id"))
+	comments, err := h.contentRepository.GetAllComment(ctx, appartId)
+	if err != nil {
+		zap.L().Error("Getting all comment failed", zap.Error(err))
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, comments)
+}
 
 func (h *Handler) DelComment(c *gin.Context) {
 	ctx := c.Request.Context()

@@ -4,18 +4,18 @@ import (
 	"diplom/internal/config"
 	"diplom/internal/delivery/http"
 	"diplom/internal/delivery/http/v1/handlers"
+	"time"
+
 	"github.com/gin-contrib/cors"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"time"
 )
 
 type Navigator struct {
 	cfg    *config.Config
 	Engine *gin.Engine
 }
-
 
 func NewNavigator(cfg *config.Config) *Navigator {
 	gin.SetMode(cfg.App.Mode)
@@ -32,12 +32,12 @@ func NewNavigator(cfg *config.Config) *Navigator {
 		),
 	)
 	Engine.Use(ginzap.RecoveryWithZap(zap.L(), true))
-   
+
 	Engine.Use(
 		cors.New(cors.Config{
-			AllowOrigins: []string{"http://localhost:3000"},
-			AllowMethods: cfg.Cors.AllowMethods,
-			AllowHeaders: cfg.Cors.AllowHeaders,
+			AllowOrigins:     []string{"http://localhost:3000"},
+			AllowMethods:     cfg.Cors.AllowMethods,
+			AllowHeaders:     cfg.Cors.AllowHeaders,
 			AllowCredentials: true,
 		}),
 	)
@@ -67,15 +67,15 @@ func (n *Navigator) RegisterRoutes(commonHandler *http.CommonHandler, majorHandl
 			}
 			content := v1.Group("/content")
 			{
-				content.GET("/ads", majorHandler.ListAds)               //+
-				content.GET("/ads/:id", majorHandler.GetByIdAds)          //+
+				content.GET("/ads", majorHandler.ListAds)        //+
+				content.GET("/ads/:id", majorHandler.GetByIdAds) //+
 				content.Use(majorHandler.AuthMiddleware)
 				content.POST("/ads", majorHandler.SubmitAnAds)            //+
 				content.GET("/ads/my", majorHandler.GetMyAds)             //+
 				content.PUT("/ads/my/:id", majorHandler.UpdateByIdAds)    //+
 				content.DELETE("/ads/my/:id", majorHandler.DeleteByIdAds) //+
 				content.GET("/appartments", majorHandler.ListAppartments)
-      			content.GET("/appartments/:id", majorHandler.GetAppartmentById)
+				content.GET("/appartments/:id", majorHandler.GetAppartmentById)
 				content.GET("/ads/buy", majorHandler.BuyApartment)
 				content.GET("/ads/confirmation", majorHandler.ConfirmationOfUser)
 				content.GET("/ads/buy/confirmation/:sales_id", majorHandler.ProofOfPurchase)
@@ -116,17 +116,18 @@ func (n *Navigator) RegisterRoutes(commonHandler *http.CommonHandler, majorHandl
 			comments := v1.Group("/comments")
 			{
 				comments.Use(majorHandler.AuthMiddleware)
+				comments.GET("/:id", majorHandler.GetAllCommentByAppart)
 				comments.POST("/:id", majorHandler.AddComment)
 				comments.DELETE("/:id", majorHandler.DelComment)
 			}
 			payments := v1.Group("/payments")
-            {
-                // 1) Сразу регистрируем endpoint для Stripe-вебхуков:
-                payments.POST("/handle-webhook", majorHandler.HandleWebhook)
-                // 2) Далее — всё, что требует залогиненного юзера:
-                payments.Use(majorHandler.AuthMiddleware)
-                payments.POST("/topup", majorHandler.TopUp)
-            }
+			{
+				// 1) Сразу регистрируем endpoint для Stripe-вебхуков:
+				payments.POST("/handle-webhook", majorHandler.HandleWebhook)
+				// 2) Далее — всё, что требует залогиненного юзера:
+				payments.Use(majorHandler.AuthMiddleware)
+				payments.POST("/topup", majorHandler.TopUp)
+			}
 		}
 	}
 }

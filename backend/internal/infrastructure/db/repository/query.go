@@ -393,6 +393,17 @@ const (
     FROM auth_users
     WHERE id = $1;`
 
+	GetAllCommentByAppartQuery = `
+	SELECT
+		c.id,
+		c.user_id,
+		c.comment,
+		u.name AS user_name
+	FROM comments c
+	JOIN auth_users u ON c.user_id = u.id
+	WHERE c.appartment_id = $1;
+	`
+
 	addNewCommQuery = `
     INSERT INTO comments (appartment_id, user_id, comment) VALUES ($1, $2, $3);`
 
