@@ -381,6 +381,8 @@ const (
 
 	GetAllCommentByAppartQuery = `
 	SELECT
+		c.id,
+		c.user_id,
 		c.comment,
 		u.name AS user_name
 	FROM comments c

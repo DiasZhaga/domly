@@ -13,9 +13,15 @@ func (h *Handler) AddComment(c *gin.Context) {
 
 	userId := c.GetInt("user_id")
 	appartId, _ := strconv.Atoi(c.Param("id"))
-	comment := c.Query("comment")
+	var req struct {
+		Comment string `json:"comment"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
 
-	if err := h.contentRepository.AddComment(ctx, userId, appartId, comment); err != nil {
+	if err := h.contentRepository.AddComment(ctx, userId, appartId, req.Comment); err != nil {
 		zap.L().Error("Adding comment failed", zap.Error(err))
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return

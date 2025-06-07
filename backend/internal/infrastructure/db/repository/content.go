@@ -998,7 +998,7 @@ func (c *ContentRepository) GetAllComment(ctx context.Context, appartId int) ([]
 	var result []models.CommentAppart
 	for rows.Next() {
 		var comm models.CommentAppart
-		if err := rows.Scan(&comm.Username, &comm.Comm); err != nil {
+		if err := rows.Scan(&comm.Id, &comm.UserId, &comm.Username, &comm.Comm); err != nil {
 			zap.L().Error("scan CommentApart failed", zap.Error(err))
 			continue
 		}

@@ -69,6 +69,8 @@ type Comment struct {
 }
 
 type CommentAppart struct {
+	Id       int    `json:"id"`
+	UserId   int    `json:"user_id"`
 	Username string `json:"username"`
 	Comm     string `json:"comment"`
 }

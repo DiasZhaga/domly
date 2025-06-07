@@ -25,7 +25,13 @@ const PropertyDetails = () => {
   const [infoModalData, setInfoModalData] = useState({ title: "", message: "" });
   const [showAddFunds, setShowAddFunds] = useState(false);
 
-  // Загружаем данные объявления
+  // Комментарии
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+
+  const isGuest = !user;
+  const needsSubscription = user && !user.isSubscribed;
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -44,11 +50,49 @@ const PropertyDetails = () => {
     })();
   }, [id]);
 
+  useEffect(() => {
+    if (ad?.id && !isGuest && !needsSubscription) {
+      fetch(`/api/v1/comments/${ad.id}`, { credentials: "include" })
+        .then((res) => res.json())
+        .then(data => setComments(Array.isArray(data) ? data : []))
+        .catch(() => setComments([]));
+    }
+  }, [ad, isGuest, needsSubscription]);
+
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+    try {
+      await fetch(`/api/v1/comments/${ad.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ comment: newComment }),
+      });
+      setNewComment("");
+      const res = await fetch(`/api/v1/comments/${ad.id}`, { credentials: "include" });
+      setComments(await res.json());
+    } catch (err) {
+      console.error("Failed to post comment", err);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    try {
+      await fetch(`/api/v1/comments/${commentId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const res = await fetch(`/api/v1/comments/${ad.id}`, { credentials: "include" });
+      setComments(await res.json());
+    } catch (err) {
+      console.error("Failed to delete comment", err);
+    }
+  };
+
   if (loading) return <p className="text-center py-5">Loading…</p>;
   if (error) return <p className="text-danger text-center py-5">{error.message}</p>;
   if (!ad) return <p className="text-center py-5">No data</p>;
 
-  // URL фотографий
   const photoUrls = (ad.url_photos || []).map((p) =>
     p.url.startsWith("http") ? p.url : `/ads-photos/${p.url}`
   );
@@ -59,15 +103,11 @@ const PropertyDetails = () => {
     }
   };
 
-  // Основная функция: выполняем покупку
   const performPurchase = async () => {
-    // 1) Проверяем авторизацию
     if (!user) {
       setShowAuthModal(true);
       return;
     }
-
-    // 2) Составляем параметры
     const apartmentId = ad.id;
     const sellerId = ad.author.id;
     const sum = ad.price;
@@ -75,24 +115,18 @@ const PropertyDetails = () => {
     try {
       const res = await fetch(
         `/api/v1/content/ads/buy?apartment_id=${apartmentId}&seller_id=${sellerId}&sum=${sum}`,
-        {
-          method: "GET",
-          credentials: "include",
-        }
+        { method: "GET", credentials: "include" }
       );
 
       if (res.ok) {
-        // Успешный запрос: показываем информационную модалку и перенаправляем
         setInfoModalData({
           title: "Purchase Initiated",
-          message:
-            "Your purchase has been initiated! Please confirm this transaction within three days.",
+          message: "Your purchase has been initiated! Please confirm this transaction within three days.",
         });
         setShowInfoModal(true);
       } else {
         const body = await res.json().catch(() => ({}));
         if (res.status === 400 && body.error === "not enough money") {
-          // Недостаточно средств → открываем модалку пополнения
           setShowAddFunds(true);
         } else {
           setInfoModalData({
@@ -104,10 +138,7 @@ const PropertyDetails = () => {
       }
     } catch (e) {
       console.error(e);
-      setInfoModalData({
-        title: "Network Error",
-        message: "Network error occurred. Please try again later.",
-      });
+      setInfoModalData({ title: "Network Error", message: "Network error occurred. Please try again later." });
       setShowInfoModal(true);
     }
   };
@@ -118,101 +149,117 @@ const PropertyDetails = () => {
         <div className="container-fluid p-0 bg-white">
           <div className="container py-5 mt-5">
             <div className="row g-5">
-              {/* Галерея */}
-              <PropertyGallery
-                thumbnails={photoUrls}
-                initialMain={photoUrls[0] || "/placeholder.png"}
-              />
-
-              {/* Детали & Автор */}
+              <PropertyGallery thumbnails={photoUrls} initialMain={photoUrls[0] || "/placeholder.png"} />
               <div className="col-lg-5">
                 <h1 className="fw-bold mb-3">{ad.title}</h1>
-                <h3 className="text-success mb-4">
-                  ₸{Number(ad.price).toLocaleString("ru-RU")}
-                </h3>
-                <p>
-                  <strong>Address:</strong> {ad.address}, {ad.city}, {ad.district}
-                </p>
+                <h3 className="text-success mb-4">₸{Number(ad.price).toLocaleString("ru-RU")}</h3>
+                <p><strong>Address:</strong> {ad.address}, {ad.city}, {ad.district}</p>
                 <hr />
                 <div className="row">
                   <div className="col-sm-6">
-                    <p>
-                      <strong>Area:</strong> {ad.square} m²
-                    </p>
-                    <p>
-                      <strong>Rooms:</strong> {ad.num_rooms}
-                    </p>
-                    <p>
-                      <strong>Floor:</strong> {ad.floor}
-                    </p>
-                    <p>
-                      <strong>Ceiling height:</strong> {ad.ceiling_height} m
-                    </p>
+                    <p><strong>Area:</strong> {ad.square} m²</p>
+                    <p><strong>Rooms:</strong> {ad.num_rooms}</p>
+                    <p><strong>Floor:</strong> {ad.floor}</p>
+                    <p><strong>Ceiling height:</strong> {ad.ceiling_height} m</p>
                   </div>
                   <div className="col-sm-6">
-                    <p>
-                      <strong>Year built:</strong> {ad.year_construction}
-                    </p>
-                    <p>
-                      <strong>Type:</strong> {ad.ads_type === "1" ? "For Sell" : "For Rent"}
-                    </p>
+                    <p><strong>Year built:</strong> {ad.year_construction}</p>
+                    <p><strong>Type:</strong> {ad.ads_type === "1" ? "For Sell" : "For Rent"}</p>
                   </div>
                 </div>
 
-                {/* Карточка автора (если залогинен) */}
                 {user && (
                   <div className="card border-0 shadow-sm p-4 mt-4">
                     <h5 className="mb-3">Author of the ad</h5>
                     <div className="d-flex align-items-center">
-                      <i
-                        className="fa fa-user-circle fa-2x me-3"
-                        style={{ color: "var(--primary)" }}
-                      />
+                      <i className="fa fa-user-circle fa-2x me-3" style={{ color: "var(--primary)" }} />
                       <div>
                         <p className="mb-1 fw-semibold">{ad.author.name}</p>
                         <p className="text-muted mb-0">{ad.author.login}</p>
                       </div>
                     </div>
                     <div className="d-flex flex-column mt-4">
-                      <button
-                        className="btn btn-outline-primary mb-2"
-                        onClick={startChat}
-                      >
-                        Send Message
-                      </button>
-                      <button
-                        className="btn w-100 text-primary"
-                        style={{ backgroundColor: "#e6f7ff" }}
-                        onClick={() => setShowConfirmModal(true)}
-                      >
-                        Make a purchase
-                      </button>
+                      <button className="btn btn-outline-primary mb-2" onClick={startChat}>Send Message</button>
+                      <button className="btn w-100 text-primary" style={{ backgroundColor: "#e6f7ff" }} onClick={() => setShowConfirmModal(true)}>Make a purchase</button>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Описание & Комментарии */}
             <div className="row mt-5">
               <div className="col-12">
                 <h4>Description</h4>
                 <p style={{ lineHeight: 1.7 }}>{ad.description}</p>
 
                 <h4 className="mt-4">Comments</h4>
-                {/* ... остальной код комментариев без изменений ... */}
+
+                {(!isGuest && !needsSubscription) ? (
+                  <div className="comments-normal">
+                    <textarea
+                      className="form-control mb-3"
+                      placeholder="Add comment..."
+                      rows={3}
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                    />
+                    <button className="btn btn-primary mb-4" onClick={handleAddComment}>Submit</button>
+                    {comments.map((c, i) => (
+                      <div key={i} className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center">
+                          <strong>{c.username}</strong>
+                          {user?.id === c.user_id && (
+                            <button
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleDeleteComment(c.id)}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                        <p className="mb-1">{c.comment}</p>
+                        <hr />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="blurred-box">
+                    <div className="blurred-text">
+                      <textarea className="form-control mb-3" placeholder="Add comment..." rows={3} disabled />
+                      {comments.map((c, i) => (
+                        <div key={i} className="mb-3">
+                          <strong>{c.username}</strong>
+                          <p className="mb-1">{c.comment}</p>
+                          <hr />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="overlay-message">
+                      {isGuest && (
+                        <>
+                          <p className="mb-3">Please register to view and add comments.</p>
+                          <button className="btn btn-success" onClick={() => setShowAuthModal(true)}>Register</button>
+                        </>
+                      )}
+                      {needsSubscription && (
+                        <>
+                          <p className="mb-3">Purchase a subscription to see comments.</p>
+                          <button className="btn btn-success" onClick={() => navigate("/subscribe")}>Buy Premium</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Модалка авторизации (если гость) */}
       {showAuthModal && (
         <SignInModal onClose={() => setShowAuthModal(false)} initialTab="register" />
       )}
 
-      {/* Модалка подтверждения перед fetch("/ads/buy") */}
       {showConfirmModal && (
         <ConfirmModal
           title="Are you sure you want to make this purchase?"
@@ -227,14 +274,12 @@ const PropertyDetails = () => {
         />
       )}
 
-      {/* Информационная модалка (после performPurchase) */}
       {showInfoModal && (
         <InfoModal
           title={infoModalData.title}
           message={infoModalData.message}
           onClose={() => {
             setShowInfoModal(false);
-            // если покупка была успешна, редиректим на /purchase-confirmation
             if (infoModalData.title === "Purchase Initiated") {
               navigate("/purchase-confirmation");
             }
@@ -242,15 +287,10 @@ const PropertyDetails = () => {
         />
       )}
 
-      {/* Если недостаточно средств, открываем AddFundsModal */}
       {showAddFunds && (
         <AddFundsModal
           userId={user.id}
           onSuccess={(newBalance, isSubscribed) => {
-            // апдейтим контекст user, если нужно:
-            if (typeof newBalance === "number") {
-              // ... предполагается, что у вас setUser(...) доступен через useAuth ...
-            }
             setShowAddFunds(false);
           }}
           onError={(msg) => {
