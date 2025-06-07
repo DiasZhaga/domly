@@ -1,8 +1,8 @@
 package models
 
 import (
-	"errors"
 	"diplom/internal/common"
+	"errors"
 	"time"
 )
 
@@ -26,10 +26,10 @@ type Content struct {
 	StopedAt              time.Time             `form:"stoped_at" json:"stoped_at"`
 	City                  string                `form:"city" json:"city"`
 	District              string                `form:"district" json:"district"`
-	Pledge             	  bool     				`form:"pledge" json:"pledge,omitempty"`   // теперь bool
-	BankID             	  int      				`form:"bank_id" json:"bank_id,omitempty"` // теперь int
+	Pledge                bool                  `form:"pledge" json:"pledge,omitempty"`   // теперь bool
+	BankID                int                   `form:"bank_id" json:"bank_id,omitempty"` // теперь int
 	DescriptionAppartment DescriptionAppartment `json:"description_appartment,omitempty"`
-	Author   User   `json:"author,omitempty"`
+	Author                User                  `json:"author,omitempty"`
 }
 
 type Author struct {
@@ -50,17 +50,17 @@ type Sales struct {
 }
 
 type DescriptionAppartment struct {
-	Id             string   `json:"id,omitempty"`
-	Name           string   `json:"name,omitempty"`
-	Description    string   `json:"description,omitempty"`
-	Address        string   `json:"address,omitempty"`
-	Floors         string   `json:"floors,omitempty"`
-	Class          string   `json:"class,omitempty"`
-	Parking        string   `json:"parking,omitempty"`
-	Peculiarities  []string `json:"peculiarities,omitempty"`
-	ResidentsValue []string `json:"residents_value,omitempty"`
+	Id             string    `json:"id,omitempty"`
+	Name           string    `json:"name,omitempty"`
+	Description    string    `json:"description,omitempty"`
+	Address        string    `json:"address,omitempty"`
+	Floors         string    `json:"floors,omitempty"`
+	Class          string    `json:"class,omitempty"`
+	Parking        string    `json:"parking,omitempty"`
+	Peculiarities  []string  `json:"peculiarities,omitempty"`
+	ResidentsValue []string  `json:"residents_value,omitempty"`
 	Comments       []Comment `json:"comments,omitempty"`
-	DistrictID      int      `json:"district_id"`
+	DistrictID     int       `json:"district_id"`
 }
 
 type Comment struct {
@@ -68,47 +68,51 @@ type Comment struct {
 	Comm string `json:"comment,omitempty"`
 }
 
+type CommentAppart struct {
+	Username string `json:"username"`
+	Comm     string `json:"comment"`
+}
+
 type Photos struct {
-    Id      string `json:"id,omitempty"`
-    Url     string `json:"url,omitempty"`
-    Type    bool   `json:"type,omitempty"`    
-    MainURL bool   `json:"main_url,omitempty"`
+	Id      string `json:"id,omitempty"`
+	Url     string `json:"url,omitempty"`
+	Type    bool   `json:"type,omitempty"`
+	MainURL bool   `json:"main_url,omitempty"`
 }
 
 type City struct {
-  ID   int    `json:"id"`
-  Name string `json:"name"`
+	ID   int    `json:"id"`
+	Name string `json:"name"`
 }
 type District struct {
-  ID     int    `json:"id"`
-  CityID int    `json:"city_id"`
-  Name   string `json:"name"`
+	ID     int    `json:"id"`
+	CityID int    `json:"city_id"`
+	Name   string `json:"name"`
 }
 
 type Apartment struct {
-    ID              string   `json:"id"`
-    Name            string   `json:"name"`
-    Description     string   `json:"description,omitempty"`
-    Address         string   `json:"address,omitempty"`
-    Floors          string   `json:"floors,omitempty"`
-    Class           string   `json:"class,omitempty"`
-    Parking         string   `json:"parking,omitempty"`
-    Peculiarities   []string `json:"peculiarities,omitempty"`
-    ResidentsValue  []string `json:"residents_value,omitempty"`
-    Comments        []string `json:"comments,omitempty"`
-    DistrictID      int      `json:"district_id"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description,omitempty"`
+	Address        string   `json:"address,omitempty"`
+	Floors         string   `json:"floors,omitempty"`
+	Class          string   `json:"class,omitempty"`
+	Parking        string   `json:"parking,omitempty"`
+	Peculiarities  []string `json:"peculiarities,omitempty"`
+	ResidentsValue []string `json:"residents_value,omitempty"`
+	Comments       []string `json:"comments,omitempty"`
+	DistrictID     int      `json:"district_id"`
 }
 
 type User struct {
-    ID        int       `json:"id"`
-    Login     string    `json:"login"`
-    Name      string    `json:"name"`
-    CreatedAt time.Time `json:"created_at"`
+	ID        int        `json:"id"`
+	Login     string     `json:"login"`
+	Name      string     `json:"name"`
+	CreatedAt time.Time  `json:"created_at"`
 	Subscribe bool       `json:"subscribe"`
-  	StopedAt  *time.Time `json:"stoped_at,omitempty"`
-  	Balance   float64    `json:"balance"`
+	StopedAt  *time.Time `json:"stoped_at,omitempty"`
+	Balance   float64    `json:"balance"`
 }
-
 
 func (content *Content) ChekingCorrectness() error {
 	if content.Title == "" || content.NameAppartment == "" || content.Square == "" || content.NumRooms == "" || content.Floor ==
@@ -121,12 +125,12 @@ func (content *Content) ChekingCorrectness() error {
 	if len(content.Title) > common.MaxTtileLength {
 		return common.LenTitleError
 	}
-	 if content.Pledge && content.BankID <= 0 {
+	if content.Pledge && content.BankID <= 0 {
 		return errors.New("bank_id must be provided when pledge = true")
-		}
-		if !content.Pledge {
+	}
+	if !content.Pledge {
 		content.BankID = 0 // или оставить, в SQL вставим NULL
-		}
+	}
 
 	return nil
 }

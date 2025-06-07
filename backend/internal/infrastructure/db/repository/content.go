@@ -6,10 +6,11 @@ import (
 	"diplom/internal/common"
 	"diplom/internal/domain/models"
 	"fmt"
-	"github.com/lib/pq"
-	"go.uber.org/zap"
 	"strings"
 	"time"
+
+	"github.com/lib/pq"
+	"go.uber.org/zap"
 )
 
 type ContentRepository struct {
@@ -23,51 +24,50 @@ func NewContentRepository(db *sql.DB) *ContentRepository {
 }
 
 func (r *ContentRepository) SaveNewAds(ctx context.Context, userId int, content models.Content) (int, error) {
-    // Устанавливаем таймаут на выполнение SQL
-    dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
-    defer cancel()
+	// Устанавливаем таймаут на выполнение SQL
+	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+	defer cancel()
 
-    // Делим логику: если pledge=false, передаём bankIDParam=nil
-    var bankIDParam interface{}
-    if content.Pledge {
-        // Если контент.Pledge == true, используем content.BankID (>0)
-        bankIDParam = content.BankID
-    } else {
-        // Если контент.Pledge == false, пишем NULL в поле bank_id
-        bankIDParam = nil
-    }
+	// Делим логику: если pledge=false, передаём bankIDParam=nil
+	var bankIDParam interface{}
+	if content.Pledge {
+		// Если контент.Pledge == true, используем content.BankID (>0)
+		bankIDParam = content.BankID
+	} else {
+		// Если контент.Pledge == false, пишем NULL в поле bank_id
+		bankIDParam = nil
+	}
 
-    // Поле StopedAt уже может быть установлено до вызова; 
-    // по вашим примерам обычно оно := Now()+30 дней
-    // Поле IsActive тоже уже, вероятно, true
-    var adsId int
-    err := r.db.QueryRowContext(dbCtx, saveNewAdsQuery,
-        content.Title,
-        content.NameAppartment,
-        content.Square,
-        content.NumRooms,
-        content.Floor,
-        content.YearConstruction,
-        content.Address,
-        content.Price,
-        content.CeilingHeight,
-        content.Description,
-        userId,                 // $11 → author_id
-        content.AdsType,        // $12 → ads_type
-        content.IsActive,       // $13 → is_active
-        content.StopedAt,       // $14 → stoped_at (time.Time)
-        content.City,           // $15 → city
-        content.District,       // $16 → district
-        content.Pledge,         // $17 → pledge (bool)
-        bankIDParam,            // $18 → bank_id (int или NULL)
-    ).Scan(&adsId)
-    if err != nil {
-        zap.L().Error("error saving ads", zap.Error(err))
-        return 0, err
-    }
-    return adsId, nil
+	// Поле StopedAt уже может быть установлено до вызова;
+	// по вашим примерам обычно оно := Now()+30 дней
+	// Поле IsActive тоже уже, вероятно, true
+	var adsId int
+	err := r.db.QueryRowContext(dbCtx, saveNewAdsQuery,
+		content.Title,
+		content.NameAppartment,
+		content.Square,
+		content.NumRooms,
+		content.Floor,
+		content.YearConstruction,
+		content.Address,
+		content.Price,
+		content.CeilingHeight,
+		content.Description,
+		userId,           // $11 → author_id
+		content.AdsType,  // $12 → ads_type
+		content.IsActive, // $13 → is_active
+		content.StopedAt, // $14 → stoped_at (time.Time)
+		content.City,     // $15 → city
+		content.District, // $16 → district
+		content.Pledge,   // $17 → pledge (bool)
+		bankIDParam,      // $18 → bank_id (int или NULL)
+	).Scan(&adsId)
+	if err != nil {
+		zap.L().Error("error saving ads", zap.Error(err))
+		return 0, err
+	}
+	return adsId, nil
 }
-
 
 func (c *ContentRepository) SaveNewPhoto(ctx context.Context, userId int, filename string, main bool) error {
 	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
@@ -95,218 +95,227 @@ func (c *ContentRepository) SaveDocument(ctx context.Context, adsId int, filenam
 	return nil
 }
 
-
 func (c *ContentRepository) ListAds(
-    ctx context.Context,
-    adsType   string,
-    city      string,
-    district  string,
-    complex   string,
-    rooms     []string,
-	minPrice  string,
-    maxPrice  string,
-    minArea   string,
-    maxArea   string,
-    minYear   string,
-    maxYear   string,
-    minFloor  string,
-    maxFloor  string,
-    minCeil   string,
-    maxCeil   string,
-    pledge    string,
+	ctx context.Context,
+	adsType string,
+	city string,
+	district string,
+	complex string,
+	rooms []string,
+	minPrice string,
+	maxPrice string,
+	minArea string,
+	maxArea string,
+	minYear string,
+	maxYear string,
+	minFloor string,
+	maxFloor string,
+	minCeil string,
+	maxCeil string,
+	pledge string,
 ) ([]models.Content, error) {
-    dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
-    defer cancel()
+	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+	defer cancel()
 
-    base := defQuery
-    var conds []string
-    var args  []interface{}
-    idx := 1
+	base := defQuery
+	var conds []string
+	var args []interface{}
+	idx := 1
 
-    if adsType != "" {
-        conds = append(conds, fmt.Sprintf("ads.ads_type = $%d", idx))
-        args = append(args, adsType); idx++
-    }
-    if city != "" {
-        conds = append(conds, fmt.Sprintf("ads.city = $%d", idx))
-        args = append(args, city); idx++
-    }
-    if district != "" {
-        conds = append(conds, fmt.Sprintf("ads.district = $%d", idx))
-        args = append(args, district); idx++
-    }
-    if complex != "" {
-        conds = append(conds, fmt.Sprintf("ads.name_appartment = $%d", idx))
-        args = append(args, complex); idx++
-    }
-    if len(rooms) > 0 {
-        // IN ($N, $N+1, ...)
-        placeholders := make([]string, len(rooms))
-        for i, r := range rooms {
-            placeholders[i] = fmt.Sprintf("$%d", idx)
-            args = append(args, r)
-            idx++
-        }
-        conds = append(conds, fmt.Sprintf("ads.num_rooms IN (%s)", strings.Join(placeholders, ",")))
-    }
+	if adsType != "" {
+		conds = append(conds, fmt.Sprintf("ads.ads_type = $%d", idx))
+		args = append(args, adsType)
+		idx++
+	}
+	if city != "" {
+		conds = append(conds, fmt.Sprintf("ads.city = $%d", idx))
+		args = append(args, city)
+		idx++
+	}
+	if district != "" {
+		conds = append(conds, fmt.Sprintf("ads.district = $%d", idx))
+		args = append(args, district)
+		idx++
+	}
+	if complex != "" {
+		conds = append(conds, fmt.Sprintf("ads.name_appartment = $%d", idx))
+		args = append(args, complex)
+		idx++
+	}
+	if len(rooms) > 0 {
+		// IN ($N, $N+1, ...)
+		placeholders := make([]string, len(rooms))
+		for i, r := range rooms {
+			placeholders[i] = fmt.Sprintf("$%d", idx)
+			args = append(args, r)
+			idx++
+		}
+		conds = append(conds, fmt.Sprintf("ads.num_rooms IN (%s)", strings.Join(placeholders, ",")))
+	}
 	if minPrice != "" {
 		conds = append(conds, fmt.Sprintf("ads.price >= $%d", idx))
-		args  = append(args, minPrice)
+		args = append(args, minPrice)
 		idx++
 	}
 	if maxPrice != "" {
 		conds = append(conds, fmt.Sprintf("ads.price <= $%d", idx))
-		args  = append(args, maxPrice)
+		args = append(args, maxPrice)
 		idx++
 	}
-    if minArea != "" {
-        conds = append(conds, fmt.Sprintf("ads.square >= $%d", idx))
-        args = append(args, minArea); idx++
-    }
-    if maxArea != "" {
-        conds = append(conds, fmt.Sprintf("ads.square <= $%d", idx))
-        args = append(args, maxArea); idx++
-    }
-    if minYear != "" {
-        conds = append(conds, fmt.Sprintf("ads.year_construction >= $%d", idx))
-        args = append(args, minYear); idx++
-    }
-    if maxYear != "" {
-        conds = append(conds, fmt.Sprintf("ads.year_construction <= $%d", idx))
-        args = append(args, maxYear); idx++
-    }
-    if minFloor != "" {
-        conds = append(conds, fmt.Sprintf("ads.floor >= $%d", idx))
-        args = append(args, minFloor); idx++
-    }
-    if maxFloor != "" {
-        conds = append(conds, fmt.Sprintf("ads.floor <= $%d", idx))
-        args = append(args, maxFloor); idx++
-    }
-    if minCeil != "" {
-        conds = append(conds, fmt.Sprintf("ads.ceiling_height >= $%d", idx))
-        args = append(args, minCeil); idx++
-    }
-    if maxCeil != "" {
-        conds = append(conds, fmt.Sprintf("ads.ceiling_height <= $%d", idx))
-        args = append(args, maxCeil); idx++
-    }
-    switch pledge {
-    case "true":
-        conds = append(conds, "ads.pledge = true")
-    case "false":
-        conds = append(conds, "ads.pledge = false")
-    }
+	if minArea != "" {
+		conds = append(conds, fmt.Sprintf("ads.square >= $%d", idx))
+		args = append(args, minArea)
+		idx++
+	}
+	if maxArea != "" {
+		conds = append(conds, fmt.Sprintf("ads.square <= $%d", idx))
+		args = append(args, maxArea)
+		idx++
+	}
+	if minYear != "" {
+		conds = append(conds, fmt.Sprintf("ads.year_construction >= $%d", idx))
+		args = append(args, minYear)
+		idx++
+	}
+	if maxYear != "" {
+		conds = append(conds, fmt.Sprintf("ads.year_construction <= $%d", idx))
+		args = append(args, maxYear)
+		idx++
+	}
+	if minFloor != "" {
+		conds = append(conds, fmt.Sprintf("ads.floor >= $%d", idx))
+		args = append(args, minFloor)
+		idx++
+	}
+	if maxFloor != "" {
+		conds = append(conds, fmt.Sprintf("ads.floor <= $%d", idx))
+		args = append(args, maxFloor)
+		idx++
+	}
+	if minCeil != "" {
+		conds = append(conds, fmt.Sprintf("ads.ceiling_height >= $%d", idx))
+		args = append(args, minCeil)
+		idx++
+	}
+	if maxCeil != "" {
+		conds = append(conds, fmt.Sprintf("ads.ceiling_height <= $%d", idx))
+		args = append(args, maxCeil)
+		idx++
+	}
+	switch pledge {
+	case "true":
+		conds = append(conds, "ads.pledge = true")
+	case "false":
+		conds = append(conds, "ads.pledge = false")
+	}
 
-    if len(conds) > 0 {
-        base += " WHERE " + strings.Join(conds, " AND ")
-    }
-    base += " ORDER BY ads.created_at DESC"
+	if len(conds) > 0 {
+		base += " WHERE " + strings.Join(conds, " AND ")
+	}
+	base += " ORDER BY ads.created_at DESC"
 
-    rows, err := c.db.QueryContext(dbCtx, base, args...)
-    if err != nil {
-        zap.L().Error("ListAds query failed", zap.Error(err))
-        return nil, err
-    }
-    defer rows.Close()
+	rows, err := c.db.QueryContext(dbCtx, base, args...)
+	if err != nil {
+		zap.L().Error("ListAds query failed", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
 
-    var out []models.Content
-    for rows.Next() {
-        var content models.Content
-        var author  models.User
+	var out []models.Content
+	for rows.Next() {
+		var content models.Content
+		var author models.User
 
-        if err := rows.Scan(
-            &content.Id, &content.Title, &content.NameAppartment,
-            &content.Square, &content.NumRooms, &content.Floor,
-            &content.YearConstruction, &content.Address, &content.Price,
-            &content.CeilingHeight, &content.Description, &content.CreatedAt,
-            &content.AdsType, &content.IsActive, &content.StopedAt,
-            &content.City, &content.District,
-            &author.ID, &author.Login, &author.Name, &author.CreatedAt,
-        ); err != nil {
-            zap.L().Error("scan ListAds row failed", zap.Error(err))
-            continue
-        }
-        content.Author = author
+		if err := rows.Scan(
+			&content.Id, &content.Title, &content.NameAppartment,
+			&content.Square, &content.NumRooms, &content.Floor,
+			&content.YearConstruction, &content.Address, &content.Price,
+			&content.CeilingHeight, &content.Description, &content.CreatedAt,
+			&content.AdsType, &content.IsActive, &content.StopedAt,
+			&content.City, &content.District,
+			&author.ID, &author.Login, &author.Name, &author.CreatedAt,
+		); err != nil {
+			zap.L().Error("scan ListAds row failed", zap.Error(err))
+			continue
+		}
+		content.Author = author
 
-        // подтягиваем фото
-        photoRows, _ := c.db.QueryContext(dbCtx, getPhotosByIdQuery, content.Id)
-        for photoRows.Next() {
-            var ph models.Photos
-            if err := photoRows.Scan(&ph.Id, &ph.Url, &ph.MainURL); err == nil {
-                content.UrlPhotos = append(content.UrlPhotos, ph)
-            }
-        }
-        photoRows.Close()
+		// подтягиваем фото
+		photoRows, _ := c.db.QueryContext(dbCtx, getPhotosByIdQuery, content.Id)
+		for photoRows.Next() {
+			var ph models.Photos
+			if err := photoRows.Scan(&ph.Id, &ph.Url, &ph.MainURL); err == nil {
+				content.UrlPhotos = append(content.UrlPhotos, ph)
+			}
+		}
+		photoRows.Close()
 
-        out = append(out, content)
-    }
+		out = append(out, content)
+	}
 
-    return out, nil
+	return out, nil
 }
-
 
 func (c *ContentRepository) GetByIdAds(ctx context.Context, id int) (models.Content, error) {
-    // 1) Контекст с таймаутом
-    dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
-    defer cancel()
+	// 1) Контекст с таймаутом
+	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+	defer cancel()
 
-    // 2) Переменные для объявления и автора
-    var content models.Content
-    var author  models.User
+	// 2) Переменные для объявления и автора
+	var content models.Content
+	var author models.User
 
-    // 3) Расширенный запрос, который отдаёт и поля из auth_users
-    err := c.db.QueryRowContext(dbCtx, getByIdAdsQuery, id).Scan(
-        // поля объявления
-        &content.Id,
-        &content.Title,
-        &content.NameAppartment,
-        &content.Square,
-        &content.NumRooms,
-        &content.Floor,
-        &content.YearConstruction,
-        &content.Address,
-        &content.Price,
-        &content.CeilingHeight,
-        &content.Description,
-        &content.CreatedAt,
-        &content.AdsType,
-        &content.IsActive,
-        &content.StopedAt,
-        &content.City,
-        &content.District,
+	// 3) Расширенный запрос, который отдаёт и поля из auth_users
+	err := c.db.QueryRowContext(dbCtx, getByIdAdsQuery, id).Scan(
+		// поля объявления
+		&content.Id,
+		&content.Title,
+		&content.NameAppartment,
+		&content.Square,
+		&content.NumRooms,
+		&content.Floor,
+		&content.YearConstruction,
+		&content.Address,
+		&content.Price,
+		&content.CeilingHeight,
+		&content.Description,
+		&content.CreatedAt,
+		&content.AdsType,
+		&content.IsActive,
+		&content.StopedAt,
+		&content.City,
+		&content.District,
 
-        // поля автора (models.User)
-       	&author.ID,
-        &author.Login,
-        &author.Name,
-        &author.CreatedAt,
-    )
-    if err != nil {
-        zap.L().Error("failed to get ad by id", zap.Error(err))
-        return models.Content{}, err
-    }
+		// поля автора (models.User)
+		&author.ID,
+		&author.Login,
+		&author.Name,
+		&author.CreatedAt,
+	)
+	if err != nil {
+		zap.L().Error("failed to get ad by id", zap.Error(err))
+		return models.Content{}, err
+	}
 
-     content.Author = author
+	content.Author = author
 
-    // подтягиваем фото
-    rows, err := c.db.QueryContext(dbCtx, getPhotosByIdQuery, content.Id)
-    if err != nil {
-        zap.L().Error("ошибка получения фото", zap.Error(err))
-        return models.Content{}, err
-    }
-    defer rows.Close()
+	// подтягиваем фото
+	rows, err := c.db.QueryContext(dbCtx, getPhotosByIdQuery, content.Id)
+	if err != nil {
+		zap.L().Error("ошибка получения фото", zap.Error(err))
+		return models.Content{}, err
+	}
+	defer rows.Close()
 
-    for rows.Next() {
-        var photo models.Photos
-        if err := rows.Scan(&photo.Id, &photo.Url, &photo.MainURL); err == nil {
-            content.UrlPhotos = append(content.UrlPhotos, photo)
-        }
-    }
+	for rows.Next() {
+		var photo models.Photos
+		if err := rows.Scan(&photo.Id, &photo.Url, &photo.MainURL); err == nil {
+			content.UrlPhotos = append(content.UrlPhotos, photo)
+		}
+	}
 
-    return content, nil
+	return content, nil
 }
-
 
 func (c *ContentRepository) GetMyAds(ctx context.Context, userId int) ([]models.Content, error) {
 	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
@@ -459,41 +468,41 @@ func (c *ContentRepository) GetByIdMyAds(ctx context.Context, id, userId int) (m
 }
 
 func (r *ContentRepository) UpdateByIdAds(ctx context.Context, id, userId int, content models.Content) error {
-    dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
-    defer cancel()
+	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+	defer cancel()
 
-    // В зависимости от content.Pledge формируем bankIDParam
-    var bankIDParam interface{}
-    if content.Pledge {
-        bankIDParam = content.BankID  // какое-то целое > 0
-    } else {
-        bankIDParam = nil             // сбросим в NULL
-    }
+	// В зависимости от content.Pledge формируем bankIDParam
+	var bankIDParam interface{}
+	if content.Pledge {
+		bankIDParam = content.BankID // какое-то целое > 0
+	} else {
+		bankIDParam = nil // сбросим в NULL
+	}
 
-    _, err := r.db.ExecContext(dbCtx, updateByIdAdsQuery,
-        content.Title,
-        content.NameAppartment,
-        content.Square,
-        content.NumRooms,
-        content.Floor,
-        content.YearConstruction,
-        content.Address,
-        content.Price,
-        content.CeilingHeight,
-        content.Description,
-        content.AdsType,
-        content.City,
-        content.District,
-        content.Pledge,    // булево (true/false)
-        bankIDParam,       // либо int>0, либо nil
-        id,                // WHERE id = $16
-        userId,            // AND author_id = $17
-    )
-    if err != nil {
-        zap.L().Error("UpdateByIdAds failed", zap.Error(err))
-        return err
-    }
-    return nil
+	_, err := r.db.ExecContext(dbCtx, updateByIdAdsQuery,
+		content.Title,
+		content.NameAppartment,
+		content.Square,
+		content.NumRooms,
+		content.Floor,
+		content.YearConstruction,
+		content.Address,
+		content.Price,
+		content.CeilingHeight,
+		content.Description,
+		content.AdsType,
+		content.City,
+		content.District,
+		content.Pledge, // булево (true/false)
+		bankIDParam,    // либо int>0, либо nil
+		id,             // WHERE id = $16
+		userId,         // AND author_id = $17
+	)
+	if err != nil {
+		zap.L().Error("UpdateByIdAds failed", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 func (c *ContentRepository) DeleteByIdPhoto(ctx context.Context, ids []int, id int) error {
@@ -725,66 +734,66 @@ func (c *ContentRepository) GetPledgeAds(ctx context.Context) ([]models.Content,
 	defer cancel()
 
 	rows, err := c.db.QueryContext(dbCtx, getPledgeQuery)
-    if err != nil {
-        zap.L().Error("error getting pledge ads", zap.Error(err))
-        return nil, err
-    }
-    defer rows.Close()
+	if err != nil {
+		zap.L().Error("error getting pledge ads", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
 
-    var contents []models.Content
-    for rows.Next() {
-        var content models.Content
-        // models.User для автора
-        var author models.User
+	var contents []models.Content
+	for rows.Next() {
+		var content models.Content
+		// models.User для автора
+		var author models.User
 
-        // Сканируем ВСЕ поля в том порядке, в каком они идут в getPledgeQuery
-        if err := rows.Scan(
-            &content.Id,
-            &content.Title,
-            &content.NameAppartment,
-            &content.Square,
-            &content.NumRooms,
-            &content.Floor,
-            &content.YearConstruction,
-            &content.Address,
-            &content.Price,
-            &content.CeilingHeight,
-            &content.Description,
-            &content.CreatedAt,
-            &content.AdsType,
-            &content.IsActive,
-            &content.StopedAt,
-            &content.City,
-            &content.District,
-            &content.BankID,           // поле bank
-            &author.ID,              // поля автора
-            &author.Login,
-            &author.Name,
-            &author.CreatedAt,
-        ); err != nil {
-            zap.L().Error("ошибка сканирования pledge-строки", zap.Error(err))
-            continue
-        }
+		// Сканируем ВСЕ поля в том порядке, в каком они идут в getPledgeQuery
+		if err := rows.Scan(
+			&content.Id,
+			&content.Title,
+			&content.NameAppartment,
+			&content.Square,
+			&content.NumRooms,
+			&content.Floor,
+			&content.YearConstruction,
+			&content.Address,
+			&content.Price,
+			&content.CeilingHeight,
+			&content.Description,
+			&content.CreatedAt,
+			&content.AdsType,
+			&content.IsActive,
+			&content.StopedAt,
+			&content.City,
+			&content.District,
+			&content.BankID, // поле bank
+			&author.ID,      // поля автора
+			&author.Login,
+			&author.Name,
+			&author.CreatedAt,
+		); err != nil {
+			zap.L().Error("ошибка сканирования pledge-строки", zap.Error(err))
+			continue
+		}
 
-        // Кладём прочитанный User
-        content.Author = author
+		// Кладём прочитанный User
+		content.Author = author
 
-        // Подтягиваем фото
-        photoRows, err := c.db.QueryContext(dbCtx, getPhotoByIdQuery, content.Id)
-        if err == nil {
-            for photoRows.Next() {
-                var photo models.Photos
-                if err := photoRows.Scan(&photo.Id, &photo.Url, &photo.MainURL); err == nil {
-                    content.UrlPhotos = append(content.UrlPhotos, photo)
-                }
-            }
-            photoRows.Close()
-        }
+		// Подтягиваем фото
+		photoRows, err := c.db.QueryContext(dbCtx, getPhotoByIdQuery, content.Id)
+		if err == nil {
+			for photoRows.Next() {
+				var photo models.Photos
+				if err := photoRows.Scan(&photo.Id, &photo.Url, &photo.MainURL); err == nil {
+					content.UrlPhotos = append(content.UrlPhotos, photo)
+				}
+			}
+			photoRows.Close()
+		}
 
-        contents = append(contents, content)
-    }
+		contents = append(contents, content)
+	}
 
-    return contents, nil
+	return contents, nil
 }
 
 func (c *ContentRepository) GetAllDevelopers(ctx context.Context) ([]models.Developer, error) {
@@ -833,147 +842,170 @@ func (c *ContentRepository) SaveDeveloperMessage(ctx context.Context, developerI
 }
 
 func (c *ContentRepository) ListByDistrict(ctx context.Context, districtID int) ([]models.DescriptionAppartment, error) {
-    dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
-    defer cancel()
+	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+	defer cancel()
 
-    rows, err := c.db.QueryContext(dbCtx, getApartmentsByDistrictQuery, districtID)
-    if err != nil {
-        zap.L().Error("failed to list apartments", zap.Error(err))
-        return nil, err
-    }
-    defer rows.Close()
+	rows, err := c.db.QueryContext(dbCtx, getApartmentsByDistrictQuery, districtID)
+	if err != nil {
+		zap.L().Error("failed to list apartments", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
 
-    var list []models.DescriptionAppartment
-    for rows.Next() {
-        var apt models.DescriptionAppartment
-        var rawPec, rawRes, rawCom string
+	var list []models.DescriptionAppartment
+	for rows.Next() {
+		var apt models.DescriptionAppartment
+		var rawPec, rawRes, rawCom string
 
-        if err := rows.Scan(
-            &apt.Id,
-            &apt.Name,
-            &apt.Description,
-            &apt.Address,
-            &apt.Floors,
-            &apt.Class,
-            &apt.Parking,
-            &rawPec,
-            &rawRes,
-            &rawCom,
-            &apt.DistrictID,
-        ); err != nil {
-            zap.L().Error("scan apartment failed", zap.Error(err))
-            continue
-        }
+		if err := rows.Scan(
+			&apt.Id,
+			&apt.Name,
+			&apt.Description,
+			&apt.Address,
+			&apt.Floors,
+			&apt.Class,
+			&apt.Parking,
+			&rawPec,
+			&rawRes,
+			&rawCom,
+			&apt.DistrictID,
+		); err != nil {
+			zap.L().Error("scan apartment failed", zap.Error(err))
+			continue
+		}
 
-        // Преобразуем rawPec и rawRes как раньше:
-        apt.Peculiarities  = common.FilterNonEmpty(strings.Split(rawPec, ";"))
-        apt.ResidentsValue = common.FilterNonEmpty(strings.Split(rawRes, ";"))
+		// Преобразуем rawPec и rawRes как раньше:
+		apt.Peculiarities = common.FilterNonEmpty(strings.Split(rawPec, ";"))
+		apt.ResidentsValue = common.FilterNonEmpty(strings.Split(rawRes, ";"))
 
-        // rawCom — строка вида "comment1;comment2;comment3"
-        // Сначала получаем []string
-        commentsStr := common.FilterNonEmpty(strings.Split(rawCom, ";"))
-        // Затем преобразуем каждый элемент в models.Comment
-        comments := make([]models.Comment, 0, len(commentsStr))
-        for _, cmt := range commentsStr {
-            comments = append(comments, models.Comment{
-                Comm: cmt,
-                // Если вам нужно заполнять Id, можно парсить его либо оставлять пустым
-                // Id: "", 
-            })
-        }
-        apt.Comments = comments
+		// rawCom — строка вида "comment1;comment2;comment3"
+		// Сначала получаем []string
+		commentsStr := common.FilterNonEmpty(strings.Split(rawCom, ";"))
+		// Затем преобразуем каждый элемент в models.Comment
+		comments := make([]models.Comment, 0, len(commentsStr))
+		for _, cmt := range commentsStr {
+			comments = append(comments, models.Comment{
+				Comm: cmt,
+				// Если вам нужно заполнять Id, можно парсить его либо оставлять пустым
+				// Id: "",
+			})
+		}
+		apt.Comments = comments
 
-        list = append(list, apt)
-    }
-    return list, nil
+		list = append(list, apt)
+	}
+	return list, nil
 }
 
 func (c *ContentRepository) GetByID(ctx context.Context, id string) (models.DescriptionAppartment, error) {
-    dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
-    defer cancel()
+	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+	defer cancel()
 
-    var apt models.DescriptionAppartment
-    var rawPec, rawRes, rawCom string
+	var apt models.DescriptionAppartment
+	var rawPec, rawRes, rawCom string
 
-    err := c.db.QueryRowContext(dbCtx, getApartmentByIDQuery, id).Scan(
-        &apt.Id,
-        &apt.Name,
-        &apt.Description,
-        &apt.Address,
-        &apt.Floors,
-        &apt.Class,
-        &apt.Parking,
-        &rawPec,
-        &rawRes,
-        &rawCom,
-        &apt.DistrictID,
-    )
-    if err != nil {
-        zap.L().Error("failed to fetch apartment", zap.Error(err))
-        return apt, err
-    }
+	err := c.db.QueryRowContext(dbCtx, getApartmentByIDQuery, id).Scan(
+		&apt.Id,
+		&apt.Name,
+		&apt.Description,
+		&apt.Address,
+		&apt.Floors,
+		&apt.Class,
+		&apt.Parking,
+		&rawPec,
+		&rawRes,
+		&rawCom,
+		&apt.DistrictID,
+	)
+	if err != nil {
+		zap.L().Error("failed to fetch apartment", zap.Error(err))
+		return apt, err
+	}
 
-    apt.Peculiarities  = common.FilterNonEmpty(strings.Split(rawPec, ";"))
-    apt.ResidentsValue = common.FilterNonEmpty(strings.Split(rawRes, ";"))
+	apt.Peculiarities = common.FilterNonEmpty(strings.Split(rawPec, ";"))
+	apt.ResidentsValue = common.FilterNonEmpty(strings.Split(rawRes, ";"))
 
-    commentsStr := common.FilterNonEmpty(strings.Split(rawCom, ";"))
-    comments := make([]models.Comment, 0, len(commentsStr))
-    for _, cmt := range commentsStr {
-        comments = append(comments, models.Comment{
-            Comm: cmt,
-        })
-    }
-    apt.Comments = comments
+	commentsStr := common.FilterNonEmpty(strings.Split(rawCom, ";"))
+	comments := make([]models.Comment, 0, len(commentsStr))
+	for _, cmt := range commentsStr {
+		comments = append(comments, models.Comment{
+			Comm: cmt,
+		})
+	}
+	apt.Comments = comments
 
-    return apt, nil
+	return apt, nil
 }
 
-
 func (c *ContentRepository) GetAllCities(ctx context.Context) ([]models.City, error) {
-  dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
-  defer cancel()
+	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+	defer cancel()
 
-  rows, err := c.db.QueryContext(dbCtx, getAllCitiesQuery)
-  if err != nil {
-    zap.L().Error("failed to query cities", zap.Error(err))
-    return nil, err
-  }
-  defer rows.Close()
+	rows, err := c.db.QueryContext(dbCtx, getAllCitiesQuery)
+	if err != nil {
+		zap.L().Error("failed to query cities", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
 
-  var result []models.City
-  for rows.Next() {
-    var city models.City
-    if err := rows.Scan(&city.ID, &city.Name); err != nil {
-      zap.L().Error("scan city failed", zap.Error(err))
-      continue
-    }
-    result = append(result, city)
-  }
-  return result, nil
+	var result []models.City
+	for rows.Next() {
+		var city models.City
+		if err := rows.Scan(&city.ID, &city.Name); err != nil {
+			zap.L().Error("scan city failed", zap.Error(err))
+			continue
+		}
+		result = append(result, city)
+	}
+	return result, nil
 }
 
 // GetDistrictsByCity возвращает список районов для переданного cityID
 func (c *ContentRepository) GetDistrictsByCity(ctx context.Context, cityID int) ([]models.District, error) {
-  dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
-  defer cancel()
+	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+	defer cancel()
 
-  rows, err := c.db.QueryContext(dbCtx, getDistrictsByCityQuery, cityID)
-  if err != nil {
-    zap.L().Error("failed to query districts", zap.Error(err))
-    return nil, err
-  }
-  defer rows.Close()
+	rows, err := c.db.QueryContext(dbCtx, getDistrictsByCityQuery, cityID)
+	if err != nil {
+		zap.L().Error("failed to query districts", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
 
-  var result []models.District
-  for rows.Next() {
-    var d models.District
-    if err := rows.Scan(&d.ID, &d.CityID, &d.Name); err != nil {
-      zap.L().Error("scan district failed", zap.Error(err))
-      continue
-    }
-    result = append(result, d)
-  }
-  return result, nil
+	var result []models.District
+	for rows.Next() {
+		var d models.District
+		if err := rows.Scan(&d.ID, &d.CityID, &d.Name); err != nil {
+			zap.L().Error("scan district failed", zap.Error(err))
+			continue
+		}
+		result = append(result, d)
+	}
+	return result, nil
+}
+
+func (c *ContentRepository) GetAllComment(ctx context.Context, appartId int) ([]models.CommentAppart, error) {
+	dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+	defer cancel()
+
+	rows, err := c.db.QueryContext(dbCtx, GetAllCommentByAppartQuery, appartId)
+	if err != nil {
+		zap.L().Error("Error getting comment", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []models.CommentAppart
+	for rows.Next() {
+		var comm models.CommentAppart
+		if err := rows.Scan(&comm.Username, &comm.Comm); err != nil {
+			zap.L().Error("scan CommentApart failed", zap.Error(err))
+			continue
+		}
+		result = append(result, comm)
+	}
+
+	return result, nil
 }
 
 func (c *ContentRepository) AddComment(ctx context.Context, userId, appartId int, comment string) error {

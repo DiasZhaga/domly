@@ -30,24 +30,24 @@ type ContentRepositoryI interface {
 	SaveDocument(ctx context.Context, adsId int, filename string) error
 
 	ListAds(
-		ctx       context.Context,
-		adsType   string,
-		city      string,
-		district  string,
-		complex   string,
-		rooms     []string,
-		minPrice  string,
-		maxPrice  string,
-		minArea   string,
-		maxArea   string,
-		minYear   string,
-		maxYear   string,
-		minFloor  string,
-		maxFloor  string,
-		minCeil   string,
-		maxCeil   string,
-		pledge    string,
-		) ([]models.Content, error)
+		ctx context.Context,
+		adsType string,
+		city string,
+		district string,
+		complex string,
+		rooms []string,
+		minPrice string,
+		maxPrice string,
+		minArea string,
+		maxArea string,
+		minYear string,
+		maxYear string,
+		minFloor string,
+		maxFloor string,
+		minCeil string,
+		maxCeil string,
+		pledge string,
+	) ([]models.Content, error)
 	GetByIdAds(ctx context.Context, id int) (models.Content, error)
 	GetDescOfAppart(ctx context.Context, id string) (models.DescriptionAppartment, error)
 
@@ -75,10 +75,10 @@ type ContentRepositoryI interface {
 	SaveDeveloperMessage(ctx context.Context, developerID, userID int, msg models.DeveloperMessage) error
 
 	ListByDistrict(ctx context.Context, districtID int) ([]models.DescriptionAppartment, error)
-  	GetByID(ctx context.Context, id string) (models.DescriptionAppartment, error)
+	GetByID(ctx context.Context, id string) (models.DescriptionAppartment, error)
 
 	GetAllCities(ctx context.Context) ([]models.City, error)
-  	GetDistrictsByCity(ctx context.Context, cityID int) ([]models.District, error)
+	GetDistrictsByCity(ctx context.Context, cityID int) ([]models.District, error)
 
 	// ListPhotos(ctx context.Context, adID int) ([]models.Photos, error)
 	// AddPhoto(ctx context.Context, userID, adID int, filename string, isMain bool) (models.Photos, error)
@@ -86,6 +86,7 @@ type ContentRepositoryI interface {
 	// ReorderPhotos(ctx context.Context, adID int, ids []int) error
 
 	AddComment(ctx context.Context, userId, appartId int, comment string) error
+	GetAllComment(ctx context.Context, appartId int) ([]models.CommentAppart, error)
 	DelComment(ctx context.Context, userId, commId int) error
 
 	CheckSubscribe(ctx context.Context, userId int) bool

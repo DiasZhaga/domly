@@ -1,10 +1,11 @@
 package handlers
 
 import (
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 func (h *Handler) AddComment(c *gin.Context) {
@@ -22,18 +23,18 @@ func (h *Handler) AddComment(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-//func (h *Handler) GetAllCommentByAppart(c *gin.Context) {
-//	ctx := c.Request.Context()
-//
-//	appartId, _ := strconv.Atoi(c.Param("id"))
-//	comments, err := h.contentRepository.GetAllComment(ctx, appartId)
-//	if err != nil {
-//		zap.L().Error("Getting all comment failed", zap.Error(err))
-//		c.AbortWithStatus(http.StatusInternalServerError)
-//		return
-//	}
-//	c.JSON(http.StatusOK, comments)
-//}
+func (h *Handler) GetAllCommentByAppart(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	appartId, _ := strconv.Atoi(c.Param("id"))
+	comments, err := h.contentRepository.GetAllComment(ctx, appartId)
+	if err != nil {
+		zap.L().Error("Getting all comment failed", zap.Error(err))
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, comments)
+}
 
 func (h *Handler) DelComment(c *gin.Context) {
 	ctx := c.Request.Context()
