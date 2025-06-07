@@ -1,4 +1,7 @@
+// src/components/About.js
+
 import React from "react";
+import { Link } from "react-router-dom";
 import aboutImage from "../assets/img/about.jpg";
 
 const About = () => {
@@ -12,15 +15,19 @@ const About = () => {
             </div>
           </div>
           <div className="col-lg-6 wow fadeIn" data-wow-delay="0.5s">
-            <h1 className="mb-4">#1 Place To Find The Perfect Property</h1>
+            <h1 className="mb-4">Consult Directly with Developers</h1>
             <p className="mb-4">
-            Discover the easiest way to buy and sell real estate directly—without the hassle and extra fees. 
-            We simplify property transactions, offering transparency and complete information to help you make confident decisions.
+              We’ve partnered with BI Group, BAZIS, Ulytau Group, Jetisu Group, and many more leading developers. 
+              As a subscriber, you gain exclusive access to chat directly with developers—ask about upcoming projects, pricing, neighborhood insights, construction timelines, and secure the best terms on your new home.
             </p>
-            <p><i className="fa fa-check text-primary me-3"></i>Verified insights and honest resident reviews</p>
-            <p><i className="fa fa-check text-primary me-3"></i>Digital signing and online notarization</p>
-            <p><i className="fa fa-check text-primary me-3"></i>No hidden fees or middleman costs</p>
-            <a className="btn btn-primary py-3 px-5 mt-3" href="#">Read More</a>
+
+            <p><i className="fa fa-check text-primary me-3"></i><strong>Official channels:</strong> Communicate directly with BI Group, BAZIS, Ulytau Group, Jetisu and others.</p>
+            <p><i className="fa fa-check text-primary me-3"></i><strong>Details:</strong> Find out everything you need to know about the details of the construction project.</p>
+            <p><i className="fa fa-check text-primary me-3"></i><strong>Financial question:</strong> All information about the cost of the apartment with all additional expenses and payment methods.</p>
+
+            <Link to="/subscribe" className="btn btn-primary py-3 px-5 mt-3">
+              Read More
+            </Link>
           </div>
         </div>
       </div>

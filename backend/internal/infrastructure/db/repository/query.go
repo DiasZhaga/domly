@@ -17,33 +17,33 @@ const (
 	deleteCookieQuery = `DELETE FROM public.sessions WHERE user_id = $1`
 
 	saveNewAdsQuery = `
-		INSERT INTO public.ads (
-			title,
-			name_appartment,
-			square,
-			num_rooms,
-			floor,
-			year_construction,
-			address,
-			price,
-			ceiling_height,
-			description,
-			created_at,
-			author_id,
-			ads_type,
-			is_active,
-			stoped_at,
-			city,
-			district,
-			pledge,
-			bank_id
-		) VALUES (
-			$1,  $2,  $3,  $4,  $5,
-			$6,  $7,  $8,  $9,  $10,
-			NOW(), $11, $12, $13, $14,
-			$15, $16, $17, $18
-		) RETURNING id;
-		`
+	INSERT INTO public.ads (
+		title,
+		name_appartment,
+		square,
+		num_rooms,
+		floor,
+		year_construction,
+		address,
+		price,
+		ceiling_height,
+		description,
+		created_at,
+		author_id,
+		ads_type,
+		is_active,
+		stoped_at,
+		city,
+		district,
+		pledge,
+		bank_id
+	) VALUES (
+		$1,  $2,  $3,  $4,  $5,
+		$6,  $7,  $8,  $9,  $10,
+		NOW(), $11, $12, $13, $14,
+		$15, $16, $17, $18
+	) RETURNING id;
+	`
 
 	savePhotoQuery = `INSERT INTO public.ads_photos (ads_id, url, main_url) VALUES ($1, $2, $3)`
 	saveDocQuery   = `INSERT INTO public.document (id_ads, url_doc) VALUES ($1, $2)`
@@ -71,31 +71,35 @@ const (
 `
 
 	getByIdAdsQuery = `
-	SELECT 
-		a.id,
-		a.title,
-		a.name_appartment,
-		a.square,
-		a.num_rooms,
-		a.floor,
-		a.year_construction,
-		a.address,
-		a.price,
-		a.ceiling_height,
-		a.description,
-		a.created_at,
-		a.ads_type,
-		a.is_active,
-		a.stoped_at,
-		a.city,
-		a.district,
-		u.id           AS author_id,
-		u.login        AS author_login,
-		u.name         AS author_name,
-		u.created_at   AS author_created_at
-	FROM public.ads a
-	JOIN public.auth_users u ON a.author_id = u.id
-	WHERE a.id = $1;
+    SELECT 
+        a.id,
+        a.title,
+        a.name_appartment,
+        a.square,
+        a.num_rooms,
+        a.floor,
+        a.year_construction,
+        a.address,
+        a.price,
+        a.ceiling_height,
+        a.description,
+        a.created_at,
+        a.ads_type,
+        a.is_active,
+        a.stoped_at,
+        a.city,
+        a.district,
+		a.pledge,
+		a.bank_id,
+		b.name AS bank_name,
+        u.id           AS author_id,
+        u.login        AS author_login,
+        u.name         AS author_name,
+        u.created_at   AS author_created_at
+    FROM public.ads a
+    JOIN public.auth_users u ON a.author_id = u.id
+	LEFT JOIN public.banks b ON a.bank_id = b.id
+    WHERE a.id = $1;
 	`
 
 	getByIdMyAdsQuery = `SELECT id, title, name_appartment, square, num_rooms, floor,
@@ -129,25 +133,25 @@ const (
 		ORDER BY ads.created_at DESC`
 
 	updateByIdAdsQuery = `
-		UPDATE public.ads
-		SET
-			title             = $1,
-			name_appartment   = $2,
-			square            = $3,
-			num_rooms         = $4,
-			floor             = $5,
-			year_construction = $6,
-			address           = $7,
-			price             = $8,
-			ceiling_height    = $9,
-			description       = $10,
-			ads_type          = $11,
-			city              = $12,
-			district          = $13,
-			pledge            = $14,
-			bank_id           = $15
-		WHERE id = $16 AND author_id = $17;
-`
+	UPDATE public.ads
+	SET
+		title             = $1,
+		name_appartment   = $2,
+		square            = $3,
+		num_rooms         = $4,
+		floor             = $5,
+		year_construction = $6,
+		address           = $7,
+		price             = $8,
+		ceiling_height    = $9,
+		description       = $10,
+		ads_type          = $11,
+		city              = $12,
+		district          = $13,
+		pledge            = $14,
+		bank_id           = $15
+	WHERE id = $16 AND author_id = $17;
+	`
 
 	deletePhotoQuery = `DELETE FROM public.ads_photos WHERE ads_id = $1 AND id = ANY($2)`
 
@@ -273,6 +277,16 @@ const (
 			auth_users.id,
 			auth_users.name
 		FROM public.ads JOIN public.auth_users ON ads.author_id = auth_users.id WHERE pledge = true`
+
+
+	getBanksQuery = `
+		SELECT
+			id,
+			name
+		FROM public.banks
+		ORDER BY name;
+	`
+	
 
 	getAllDevelopersQuery = `
 		SELECT id, name, description, phone, email, logo_url, created_at
@@ -444,6 +458,23 @@ const (
 		JOIN public.auth_users AS buyer ON sales.buyer_id = buyer.id
 		JOIN public.auth_users AS seller ON sales.seller_id = seller.id
 		WHERE sales.buyer_id = $1`
+
+		getSalesBySellerQuery = `
+        SELECT
+          s.id,
+          s.id_ads,
+          buyer.id   AS buyer_id,
+          buyer.name AS buyer_name,
+          s.seller_id,
+          s.status_purchase,
+          s.purchase_amount,
+          s.confirmation_waiting_date,
+          s.purchase_canceled,
+          s.price_with_service
+        FROM public.sales AS s
+        JOIN public.auth_users AS buyer ON s.buyer_id = buyer.id
+        WHERE s.seller_id = $1;
+    `
 )
 
 var (

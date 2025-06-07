@@ -1,73 +1,88 @@
+// backend/internal/infrastructure/cache/connect.go
 package cache
 
 import (
-	"bytes"
-	"context"
-	"diplom/internal/config"
-	"io"
-	"mime"
-	"path/filepath"
+    "bytes"
+    "context"
+    "diplom/internal/config"
+    "io"
+    "mime"
+    "path/filepath"
 
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
-	"go.uber.org/zap"
+    "github.com/minio/minio-go/v7"
+    "github.com/minio/minio-go/v7/pkg/credentials"
+    "go.uber.org/zap"
 )
 
 type MinioRepository struct {
-	Client  *minio.Client
-	Bucket  string
-	BaseURL string
+    Client  *minio.Client
+    Bucket  string
+    BaseURL string
 }
 
-// NewMinioRepository инициализирует клиент MinIO по конфигу и возвращает репозиторий
-func NewMinioRepository(cfg *config.MinioConf) *MinioRepository {
-	// для локального MinIO обычно Secure=false
-	client, err := minio.New(cfg.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
-		Secure: false,
-	})
-	if err != nil {
-		panic(err)
-	}
-	zap.L().Info("Successfully initialized minio client")
+// NewPhotoMinioRepository инициализирует клиент MinIO для бакета "ads-photos":
+func NewPhotoMinioRepository(cfg *config.MinioConf) *MinioRepository {
+    client, err := minio.New(cfg.Endpoint, &minio.Options{
+        Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+        Secure: false, // локальный MinIO
+    })
+    if err != nil {
+        panic(err)
+    }
+    zap.L().Info("Successfully initialized MinIO client for PHOTOS bucket", zap.String("bucket", cfg.BucketPhotos))
 
-	return &MinioRepository{
-		Client:  client,
-		Bucket:  cfg.Bucket,
-		BaseURL: cfg.Endpoint,
-	}
+    return &MinioRepository{
+        Client:  client,
+        Bucket:  cfg.BucketPhotos,
+        BaseURL: cfg.Endpoint,
+    }
+}
+
+// NewDocMinioRepository инициализирует клиент MinIO для бакета "ads-documents":
+func NewDocMinioRepository(cfg *config.MinioConf) *MinioRepository {
+    client, err := minio.New(cfg.Endpoint, &minio.Options{
+        Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+        Secure: false,
+    })
+    if err != nil {
+        panic(err)
+    }
+    zap.L().Info("Successfully initialized MinIO client for DOCUMENTS bucket", zap.String("bucket", cfg.BucketDocuments))
+
+    return &MinioRepository{
+        Client:  client,
+        Bucket:  cfg.BucketDocuments,
+        BaseURL: cfg.Endpoint,
+    }
 }
 
 // UploadFile загружает data в MinIO под именем objectName.
-// Третий аргумент (_ int) можно игнорировать.
+// Поле _ int остаётся, но мы его больше не используем.
 func (m *MinioRepository) UploadFile(data []byte, objectName string, _ int) error {
-	// выясняем content-type по расширению
-	ext := filepath.Ext(objectName)             // например ".png"
-	contentType := mime.TypeByExtension(ext)    // например "image/png"
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
+    ext := filepath.Ext(objectName)          // e.g. ".pdf" или ".jpg"
+    contentType := mime.TypeByExtension(ext) // e.g. "application/pdf" или "image/jpeg"
+    if contentType == "" {
+        contentType = "application/octet-stream"
+    }
 
-	reader := bytes.NewReader(data)
-	_, err := m.Client.PutObject(
-		context.Background(),
-		m.Bucket,
-		objectName,
-		reader,
-		int64(len(data)),
-		minio.PutObjectOptions{
-			ContentType: contentType,
-		},
-	)
-	return err
+    reader := bytes.NewReader(data)
+    _, err := m.Client.PutObject(
+        context.Background(),
+        m.Bucket,
+        objectName,
+        reader,
+        int64(len(data)),
+        minio.PutObjectOptions{ContentType: contentType},
+    )
+    return err
 }
 
-// GetObject позволяет читать объект из MinIO по его имени
+// GetObject позволяет читать объект из MinIO по имени objectName
 func (m *MinioRepository) GetObject(objectName string) (io.ReadCloser, error) {
-	return m.Client.GetObject(
-		context.Background(),
-		m.Bucket,
-		objectName,
-		minio.GetObjectOptions{},
-	)
+    return m.Client.GetObject(
+        context.Background(),
+        m.Bucket,
+        objectName,
+        minio.GetObjectOptions{},
+    )
 }

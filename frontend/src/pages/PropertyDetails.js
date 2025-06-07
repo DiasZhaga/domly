@@ -14,11 +14,22 @@ const PropertyDetails = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // ---------------------------------
+  // 1. Состояние для городов и районов
+  // ---------------------------------
+  const [citiesList, setCitiesList] = useState([]);
+  const [districtsList, setDistrictsList] = useState([]);
+
+  // ---------------------------------
+  // 2. Состояние для самого объявления
+  // ---------------------------------
   const [ad, setAd] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Модалки
+  // ---------------------------------
+  // 3. Состояние для модалок
+  // ---------------------------------
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -33,7 +44,16 @@ const PropertyDetails = () => {
   const needsSubscription = user && !user.isSubscribed;
 
   useEffect(() => {
-    (async () => {
+    fetch("/api/v1/locations/cities", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        setCitiesList(data);
+      })
+      .catch(console.error);
+  }, []);
+  
+  useEffect(() => {
+    const loadAd = async () => {
       setLoading(true);
       setError(null);
       try {
@@ -41,13 +61,16 @@ const PropertyDetails = () => {
           credentials: "include",
         });
         if (!res.ok) throw new Error(`Error: ${res.status}`);
-        setAd(await res.json());
+        const json = await res.json();
+        setAd(json);
       } catch (e) {
         setError(e);
       } finally {
         setLoading(false);
       }
-    })();
+    };
+
+    loadAd();
   }, [id]);
 
   useEffect(() => {
@@ -89,6 +112,20 @@ const PropertyDetails = () => {
     }
   };
 
+  // ---------------------------------
+  // 7. Когда объявление загружено, подгружаем районы для его города
+  // ---------------------------------
+  useEffect(() => {
+    if (!ad || !ad.city) return;
+
+    fetch(`/api/v1/locations/districts?city_id=${ad.city}`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        setDistrictsList(data);
+      })
+      .catch(console.error);
+  }, [ad]);
+
   if (loading) return <p className="text-center py-5">Loading…</p>;
   if (error) return <p className="text-danger text-center py-5">{error.message}</p>;
   if (!ad) return <p className="text-center py-5">No data</p>;
@@ -102,6 +139,25 @@ const PropertyDetails = () => {
       navigate(`/messages?user2=${ad.author.id}`);
     }
   };
+
+  // ---------------------------------
+  // 9. Вычисляем читабельные имена города и района
+  // ---------------------------------
+  const cityName = (() => {
+    const cityIdNum = Number(ad.city);
+    const found = citiesList.find((c) => c.id === cityIdNum);
+    return found ? found.name : ad.city;
+  })();
+
+  const districtName = (() => {
+    const districtIdNum = Number(ad.district);
+    const found = districtsList.find((d) => d.id === districtIdNum);
+    return found ? found.name : ad.district;
+  })();
+
+  // ---------------------------------
+  // 10. Функция покупки
+  // ---------------------------------
 
   const performPurchase = async () => {
     if (!user) {
@@ -152,9 +208,24 @@ const PropertyDetails = () => {
               <PropertyGallery thumbnails={photoUrls} initialMain={photoUrls[0] || "/placeholder.png"} />
               <div className="col-lg-5">
                 <h1 className="fw-bold mb-3">{ad.title}</h1>
-                <h3 className="text-success mb-4">₸{Number(ad.price).toLocaleString("ru-RU")}</h3>
-                <p><strong>Address:</strong> {ad.address}, {ad.city}, {ad.district}</p>
+                <h3 className="text-success mb-4">
+                  ₸{Number(ad.price).toLocaleString("ru-RU")}
+                </h3>
+                <p>
+                  <strong>Address:</strong> {ad.address}, <em>{cityName}</em>, <em>{districtName}</em>
+                </p>
                 <hr />
+
+                {/* Статус «в залоге» */}
+                <p>
+                  <strong>In pledge:</strong>{" "}
+                  {ad.pledge ? (
+                    <span className="text-danger">{ad.bank_name || "—"}</span>
+                  ) : (
+                    <span>No</span>
+                  )}
+                </p>
+
                 <div className="row">
                   <div className="col-sm-6">
                     <p><strong>Area:</strong> {ad.square} m²</p>
@@ -193,7 +264,6 @@ const PropertyDetails = () => {
                 <p style={{ lineHeight: 1.7 }}>{ad.description}</p>
 
                 <h4 className="mt-4">Comments</h4>
-
                 {(!isGuest && !needsSubscription) ? (
                   <div className="comments-normal">
                     <textarea
@@ -244,7 +314,9 @@ const PropertyDetails = () => {
                       {needsSubscription && (
                         <>
                           <p className="mb-3">Purchase a subscription to see comments.</p>
-                          <button className="btn btn-success" onClick={() => navigate("/subscribe")}>Buy Premium</button>
+                          <button className="btn btn-success" 
+                            onClick={() => navigate("/subscribe")}
+                          >Buy Premium</button>
                         </>
                       )}
                     </div>
@@ -263,7 +335,7 @@ const PropertyDetails = () => {
       {showConfirmModal && (
         <ConfirmModal
           title="Are you sure you want to make this purchase?"
-          message="To complete this transaction, you have three days to finalize all required paperwork and register the property ownership. After that, please return to our platform and confirm the purchase so the funds can be released to the seller. If you cancel, the full amount will be refunded to your account."
+          message="To complete this transaction, you have three days to finalize all required paperwork and register the property ownership. After that, please return to our platform and confirm the purchase so the funds can be released to the seller. If you cancel, the full amount will be refunded to your account. You can confirm or cancel on Account&Payments page."
           confirmLabel="Confirm Purchase"
           cancelLabel="Cancel"
           onCancel={() => setShowConfirmModal(false)}
@@ -281,7 +353,7 @@ const PropertyDetails = () => {
           onClose={() => {
             setShowInfoModal(false);
             if (infoModalData.title === "Purchase Initiated") {
-              navigate("/purchase-confirmation");
+              navigate("/account-payments");
             }
           }}
         />

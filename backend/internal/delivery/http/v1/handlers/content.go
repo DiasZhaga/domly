@@ -17,29 +17,26 @@ import (
 
 func (h *Handler) SubmitAnAds(c *gin.Context) {
     ctx := c.Request.Context()
-    var content models.Content
-
-    // 1) Получаем userID из middleware (AuthMiddleware кладёт его в контекст)
     userID := c.GetInt(common.KeySet)
 
-    // 2) Биндим все form-поля в структуру models.Content
+    // 1) Биндим все обычные form-поля в модель Content
+    var content models.Content
     if err := c.ShouldBind(&content); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "invalid form data"})
         return
     }
 
-    // 3) Валидация: проверяем обязательные поля, в том числе логику pledge/bank_id
+    // 2) Валидация
     if err := content.ChekingCorrectness(); err != nil {
-        // Здесь вы можете разложить разные ошибки, как делали раньше.
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
         return
     }
 
-    // 4) Устанавливаем системные поля (если их нет в content)
+    // 3) При создании/обновлении: сразу делаем объявление неактивным (на проверке документов)
     content.StopedAt = time.Now().AddDate(0, 0, 30)
-    content.IsActive = true
+    content.IsActive = false
 
-    // 5) Создаём новую запись в таблице ads
+    // 4) Сохраняем объявление, получаем adsID
     adsID, err := h.contentRepository.SaveNewAds(ctx, userID, content)
     if err != nil {
         zap.L().Error("save new ad failed", zap.Error(err))
@@ -47,51 +44,90 @@ func (h *Handler) SubmitAnAds(c *gin.Context) {
         return
     }
 
-    // 6) Если фотографии не были загружены, возвращаем ответ без них
+    // 5) Обрабатываем multipart/form (фото + документы)
     form, err := c.MultipartForm()
-    if err != nil || len(form.File["photos"]) == 0 {
-        zap.L().Warn("photos were not uploaded")
-        c.JSON(http.StatusCreated, gin.H{
-            "id":              adsID,
-            "photos_uploaded": false,
-        })
-        return
+    if err != nil {
+        zap.L().Warn("multipart form is empty or invalid")
+    } else {
+        // 5.1) Загрузка ФОТОГРАФИЙ (как раньше)
+        if files, ok := form.File["photos"]; ok {
+            for i, fileHeader := range files {
+                f, err := fileHeader.Open()
+                if err != nil {
+                    zap.L().Error("error opening photo", zap.Error(err))
+                    continue
+                }
+                data, err := io.ReadAll(f)
+                f.Close()
+                if err != nil {
+                    zap.L().Error("error reading photo", zap.Error(err))
+                    continue
+                }
+
+                isMain := (i == 0)
+                filename := fmt.Sprintf("ad%d_photo_%d%s", adsID, time.Now().UnixNano(), filepath.Ext(fileHeader.Filename))
+
+                // Загружаем в бакет «ads-photos» через photoMinioRepo
+                if err := h.photoMinioRepo.UploadFile(data, filename, 1); err != nil {
+                    zap.L().Error("photo minio upload failed", zap.Error(err))
+                    continue
+                }
+                // Сохраняем запись в таблицу ads_photos
+                if err := h.contentRepository.SaveNewPhoto(ctx, adsID, filename, isMain); err != nil {
+                    zap.L().Error("saving photo record failed", zap.Error(err))
+                    continue
+                }
+                zap.L().Info("photo saved", zap.String("filename", filename))
+            }
+        }
+
+        // 5.2) Загрузка ДОКУМЕНТОВ:
+        // Оба поля – «identity» и «ownership» – обязательны:
+        requiredDocs := []string{"identity", "ownership"}
+        for _, field := range requiredDocs {
+            fileHeaders, exists := form.File[field]
+            if !exists || len(fileHeaders) == 0 {
+                // Если какого-то документа нет – возвращаем ошибку
+                c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("document '%s' not provided", field)})
+                return
+            }
+            fileHeader := fileHeaders[0]
+            f, err := fileHeader.Open()
+            if err != nil {
+                zap.L().Error("error opening document "+field, zap.Error(err))
+                continue
+            }
+            data, err := io.ReadAll(f)
+            f.Close()
+            if err != nil {
+                zap.L().Error("error reading document "+field, zap.Error(err))
+                continue
+            }
+
+            // Генерируем уникальное имя для документа
+            filename := fmt.Sprintf("ad%d_%s_%d%s", adsID, field, time.Now().UnixNano(), filepath.Ext(fileHeader.Filename))
+
+            // Загружаем в бакет «ads-documents»
+            if err := h.docMinioRepo.UploadFile(data, filename, 1); err != nil {
+                zap.L().Error("document minio upload failed", zap.Error(err))
+                continue
+            }
+            // Сохраняем запись в таблицу document (таблица уже есть в БД)
+            if err := h.contentRepository.SaveDocument(ctx, adsID, filename); err != nil {
+                zap.L().Error("saving document record failed", zap.Error(err))
+                continue
+            }
+            zap.L().Info("document saved", zap.String("field", field), zap.String("filename", filename))
+        }
     }
 
-    // 7) Загружаем каждую фотографию (логика не менялась)
-    for i, fileHeader := range form.File["photos"] {
-        f, err := fileHeader.Open()
-        if err != nil {
-            zap.L().Error("error opening photo", zap.Error(err))
-            continue
-        }
-        data, err := io.ReadAll(f)
-        f.Close()
-        if err != nil {
-            zap.L().Error("error reading photo", zap.Error(err))
-            continue
-        }
-
-        isMain := (i == 0)
-        filename := fmt.Sprintf("ad%d_%d%s", adsID, time.Now().UnixNano(), filepath.Ext(fileHeader.Filename))
-
-        // Заливаем в MinIO (bucket = ads-photos)
-        if err := h.minioRepository.UploadFile(data, filename, 1); err != nil {
-            zap.L().Error("minio upload failed", zap.Error(err))
-            continue
-        }
-        // Сохраняем запись в таблицу ads_photos
-        if err := h.contentRepository.SaveNewPhoto(ctx, adsID, filename, isMain); err != nil {
-            zap.L().Error("saving photo record failed", zap.Error(err))
-            continue
-        }
-        zap.L().Info("photo saved", zap.String("filename", filename))
-    }
-
-    // 8) Успешный ответ
+    // 6) Возвращаем ответ: объявление создано, но находится «на проверке»
     c.JSON(http.StatusCreated, gin.H{
-        "id":              adsID,
-        "photos_uploaded": true,
+        "id":                 adsID,
+        "photos_uploaded":    true,
+        "documents_uploaded": true,
+        "ad_pending_review":  true,
+        "message":            "Ваши документы отправлены на проверку. Как только проверка завершится, объявление станет активным.",
     })
 }
 
@@ -244,7 +280,7 @@ func (h *Handler) UpdateByIdAds(c *gin.Context) {
         return
     }
 
-    // 5) Выполняем UPDATE через репозиторий
+    // 5) Выполняем UPDATE через репозиторий (обновляем все текстовые поля)
     if err := h.contentRepository.UpdateByIdAds(ctx, id, userId, content); err != nil {
         zap.L().Error("update content failed", zap.Error(err))
         c.JSON(http.StatusInternalServerError, gin.H{"error": "could not update ad"})
@@ -271,7 +307,8 @@ func (h *Handler) UpdateByIdAds(c *gin.Context) {
 
     // 7) Добавление новых фото (если пришли)
     form, err := c.MultipartForm()
-    if err != nil || len(form.File["photos"]) == 0 {
+    if err != nil {
+        // Если multipart-form нет или она «невалидна», просто возвращаем успех без фото
         zap.L().Warn("photos were not uploaded")
         c.JSON(http.StatusOK, gin.H{
             "id":              id,
@@ -280,6 +317,17 @@ func (h *Handler) UpdateByIdAds(c *gin.Context) {
         return
     }
 
+    // Проверяем, есть ли файлы в поле "photos"
+    if len(form.File["photos"]) == 0 {
+        zap.L().Warn("photos were not uploaded")
+        c.JSON(http.StatusOK, gin.H{
+            "id":              id,
+            "photos_uploaded": false,
+        })
+        return
+    }
+
+    // Проходим по каждому файлу и загружаем его
     for _, fileHeader := range form.File["photos"] {
         file, err := fileHeader.Open()
         if err != nil {
@@ -293,20 +341,23 @@ func (h *Handler) UpdateByIdAds(c *gin.Context) {
             continue
         }
 
+        // Генерируем имя файла, например: "ad12_161234567890.jpeg"
         filename := fmt.Sprintf("ad%d_%d%s", id, time.Now().UnixNano(), filepath.Ext(fileHeader.Filename))
 
-        if err := h.minioRepository.UploadFile(data, filename, 1); err != nil {
-            zap.L().Error("minio upload failed", zap.Error(err))
+        // Загрузка нового фото в MinIO-бакет "ads-photos"
+        if err := h.photoMinioRepo.UploadFile(data, filename, 1); err != nil {
+            zap.L().Error("photo upload failed", zap.Error(err))
             continue
         }
+        // Сохраняем запись в таблицу ads_photos
         if err := h.contentRepository.SaveNewPhoto(ctx, id, filename, false); err != nil {
             zap.L().Error("failed to save new photo", zap.Error(err))
             continue
         }
-        zap.L().Info("save new photo", zap.String("filename", filename))
+        zap.L().Info("saved new photo", zap.String("filename", filename))
     }
 
-    // 8) Обновляем информацию о «главном» фото (если нужна такая логика)
+    // 8) Обновляем информацию о «главном» фото (например, метод выставляет первую в списке как главную)
     if err := h.contentRepository.UpdateMainPhoto(ctx, id); err != nil {
         zap.L().Error("update main photo failed", zap.Error(err))
         c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -316,7 +367,6 @@ func (h *Handler) UpdateByIdAds(c *gin.Context) {
     // 9) Успешный ответ
     c.Status(http.StatusOK)
 }
-
 func (h *Handler) DeleteByIdAds(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -452,7 +502,11 @@ func (h *Handler) ProofOfPurchase(c *gin.Context) {
 	userId := c.GetInt(common.KeySet)
 	status := c.Query("status")
 	salesId, _ := strconv.Atoi(c.Param("sales_id"))
-	sellerId, _ := strconv.Atoi(c.Param("seller_id"))
+	sellerId, err := strconv.Atoi(c.Query("seller_id"))
+    if err != nil {
+        c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid seller_id"})
+        return
+    }
 	sumStr := c.Query("sum")
 	sum, _ := strconv.ParseFloat(sumStr, 64)
 
@@ -467,4 +521,37 @@ func (h *Handler) ProofOfPurchase(c *gin.Context) {
 
 	//}
 	c.Status(http.StatusOK)
+}
+
+func (h *Handler) GetSalesOfUser(c *gin.Context) {
+    ctx := c.Request.Context()
+    sellerId := c.GetInt(common.KeySet) // допустим, middleware уже кладёт в контекст ID текущего юзера
+
+    salesList, err := h.contentRepository.GetSalesBySeller(ctx, sellerId)
+    if err != nil {
+        zap.L().Error("GetSalesOfUser: failed to fetch seller's sales", zap.Error(err))
+        c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+        return
+    }
+
+    c.JSON(http.StatusOK, salesList)
+}
+
+func (h *Handler) ListBanks(c *gin.Context) {
+    // Получаем ctx из Gin
+    ctx := c.Request.Context()
+
+    // Вызываем репозиторий
+    banks, err := h.contentRepository.GetBanks(ctx)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": "не удалось получить список банков",
+        })
+        return
+    }
+
+    // Возвращаем JSON-массив банков
+    c.JSON(http.StatusOK, gin.H{
+        "banks": banks,
+    })
 }

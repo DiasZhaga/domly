@@ -26,7 +26,8 @@
     "endpoint": "localhost:9000",
     "username": "minioadmin",
     "password": "minioadmin",
-    "bucket": "ads-photos"
+    "bucket_photos":    "ads-photos",
+    "bucket_documents": "ads-documents"
   },
   "STRIPE_SECRET_KEY": "sk_test_51RVCOW4Zhmozro8jiZE1cs6XxG5PaENiXEQs2U2SMqHSgwcOGsusIRu9E00rHENIdoEhh88YwZi2DiY037U8e4sb00ioVxVqx5",
   "STRIPE_WEBHOOK_SECRET": "whsec_8b30e970d0199531f91062903f84cc3ce92d81533e813d292268507ede01892a"

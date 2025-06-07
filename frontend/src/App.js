@@ -19,6 +19,7 @@ import EditAdPage from "./pages/EditAd";
 import EditPhotosPage from "./pages/EditPhotosPage";
 import AccountPayments from "./pages/AccountPayments";
 import PurchaseConfirmation from "./pages/PurchaseConfirmation";
+import SalesHistory from "./pages/SalesHistory";
 
 const App = () => {
   const [loading, setLoading]   = useState(true);
@@ -66,6 +67,7 @@ const App = () => {
           <Route path="/edit-photos/:id" element={<EditPhotosPage />} />
           <Route path="/account-payments" element={<AccountPayments />} />
           <Route path="/purchase-confirmation" element={<PurchaseConfirmation />} />
+          <Route path="/seller-history" element={<SalesHistory />} />
           {/* TODO: edit-ad and 404 routes */}
         </Routes>
 

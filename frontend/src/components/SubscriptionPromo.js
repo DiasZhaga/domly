@@ -18,7 +18,7 @@ const SubscriptionPromo = () => {
         <div className="col-lg-6">
           <h2 className="fw-bold mb-4">Unlock Hidden Insights Before You Buy</h2>
           <p className="mb-4 text-muted">
-            Not everything is visible in a listing. Wondering why the price is low? Or why that amazing apartment is still available? With <strong>Potolok Premium</strong>, you’ll know <u>what others won’t tell you</u>.
+            Not everything is visible in a listing. Wondering why the price is low? Or why that amazing apartment is still available? With <strong>Domly Premium</strong>, you’ll know <u>what others won’t tell you</u>.
           </p>
 
           <ul className="list-unstyled mb-4">
@@ -39,9 +39,6 @@ const SubscriptionPromo = () => {
           <div className="d-flex flex-wrap gap-3">
         <Link to="/subscribe" className="btn btn-primary">
           <span className="me-2">🔒</span> Get Full Access Now
-        </Link>
-        <Link to="/subscribe" className="btn btn-primary">
-          Learn More
         </Link>
         </div>
         </div>

@@ -450,7 +450,34 @@
     position: relative;
     animation: fadeIn 0.3s ease-in-out;
   }
-  
+
+  /* Переопределяем жёсткий max-width для “zoom”-модалки */
+/* 1) Диалог (.modal-dialog) – фиксируем макс-ширину */
+.custom-zoom-modal {
+  max-width: 95vw;     /* растянуть почти на весь экран */
+  margin: 0;           /* убрать авто-отступы, чтобы точно по центру */
+}
+
+/* 2) Контент (.modal-content) – занять всю ширину родителя */
+.custom-zoom-modal .modal-content {
+  width: 100%;
+  max-width: none;     /* сбрасываем любые прежние лимиты */
+  border-radius: 10px; /* ваш радиус скругления */
+}
+
+/* 3) Тело модалки – убрать внутренние отступы, если нужно */
+.custom-zoom-modal .modal-body {
+  padding: 0;
+}
+
+/* 4) Картинка – занять 100% контейнера и сохранить пропорции */
+.custom-zoom-modal .modal-body img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+
   .close-btn {
     position: absolute;
     right: 15px;
