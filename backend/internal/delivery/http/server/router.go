@@ -79,7 +79,8 @@ func (n *Navigator) RegisterRoutes(commonHandler *http.CommonHandler, majorHandl
 				content.GET("/ads/buy", majorHandler.BuyApartment)
 				content.GET("/ads/confirmation", majorHandler.ConfirmationOfUser)
 				content.GET("/ads/buy/confirmation/:sales_id", majorHandler.ProofOfPurchase)
-
+				content.GET("/ads/seller-history", majorHandler.GetSalesOfUser)
+				content.GET("/banks", majorHandler.ListBanks)
 			}
 			talk := v1.Group("/talk")
 			{

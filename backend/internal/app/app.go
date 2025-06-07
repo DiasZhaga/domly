@@ -42,7 +42,9 @@ func (a *App) Init() error {
 		panic(err)
 	}
 
-	minioRepository := cache.NewMinioRepository(a.cfg.Minio)
+	photoMinioRepo := cache.NewPhotoMinioRepository(a.cfg.Minio)
+    docMinioRepo := cache.NewDocMinioRepository(a.cfg.Minio)
+
 	majorRepository := repository.NewMajorRepository(a.db)
 	contentRepository := repository.NewContentRepository(a.db)
 
@@ -60,11 +62,12 @@ func (a *App) Init() error {
 	commonHandler := http.NewCommonHandler(a.db)
 
 	majorHandler := handlers.NewHandler(
-        a.cfg.StripeSecretKey,     // ← sk_test_…
-        a.cfg.StripeWebhookSecret, // ← whsec_…
+        a.cfg.StripeSecretKey,     // sk_test_…
+        a.cfg.StripeWebhookSecret, // whsec_…
         majorRepository,
         contentRepository,
-        minioRepository,
+        photoMinioRepo,
+        docMinioRepo,
     )
 
 	navigator := server.NewNavigator(a.cfg)

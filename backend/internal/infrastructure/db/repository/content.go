@@ -23,50 +23,45 @@ func NewContentRepository(db *sql.DB) *ContentRepository {
 }
 
 func (r *ContentRepository) SaveNewAds(ctx context.Context, userId int, content models.Content) (int, error) {
-    // Устанавливаем таймаут на выполнение SQL
-    dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
-    defer cancel()
+  dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+  defer cancel()
 
-    // Делим логику: если pledge=false, передаём bankIDParam=nil
-    var bankIDParam interface{}
-    if content.Pledge {
-        // Если контент.Pledge == true, используем content.BankID (>0)
-        bankIDParam = content.BankID
-    } else {
-        // Если контент.Pledge == false, пишем NULL в поле bank_id
-        bankIDParam = nil
-    }
+  // В зависимости от content.Pledge формируем bankIDParam
+  var bankIDParam interface{}
+  if content.Pledge {
+    bankIDParam = content.BankID // e.g. 5
+  } else {
+    bankIDParam = nil
+  }
 
-    // Поле StopedAt уже может быть установлено до вызова; 
-    // по вашим примерам обычно оно := Now()+30 дней
-    // Поле IsActive тоже уже, вероятно, true
-    var adsId int
-    err := r.db.QueryRowContext(dbCtx, saveNewAdsQuery,
-        content.Title,
-        content.NameAppartment,
-        content.Square,
-        content.NumRooms,
-        content.Floor,
-        content.YearConstruction,
-        content.Address,
-        content.Price,
-        content.CeilingHeight,
-        content.Description,
-        userId,                 // $11 → author_id
-        content.AdsType,        // $12 → ads_type
-        content.IsActive,       // $13 → is_active
-        content.StopedAt,       // $14 → stoped_at (time.Time)
-        content.City,           // $15 → city
-        content.District,       // $16 → district
-        content.Pledge,         // $17 → pledge (bool)
-        bankIDParam,            // $18 → bank_id (int или NULL)
-    ).Scan(&adsId)
-    if err != nil {
-        zap.L().Error("error saving ads", zap.Error(err))
-        return 0, err
-    }
-    return adsId, nil
+  var adsId int
+  err := r.db.QueryRowContext(dbCtx, saveNewAdsQuery,
+    content.Title,             // $1
+    content.NameAppartment,    // $2
+    content.Square,            // $3
+    content.NumRooms,          // $4
+    content.Floor,             // $5
+    content.YearConstruction,  // $6
+    content.Address,           // $7
+    content.Price,             // $8
+    content.CeilingHeight,     // $9
+    content.Description,       // $10
+    userId,                    // $11 → author_id
+    content.AdsType,           // $12 → ads_type
+    content.IsActive,          // $13 → is_active
+    content.StopedAt,          // $14 → stoped_at
+    content.City,              // $15 → city
+    content.District,          // $16 → district
+    content.Pledge,            // $17 → pledge
+    bankIDParam,               // $18 → bank_id
+  ).Scan(&adsId)
+  if err != nil {
+    zap.L().Error("error saving ads", zap.Error(err))
+    return 0, err
+  }
+  return adsId, nil
 }
+
 
 
 func (c *ContentRepository) SaveNewPhoto(ctx context.Context, userId int, filename string, main bool) error {
@@ -247,17 +242,23 @@ func (c *ContentRepository) ListAds(
 
 
 func (c *ContentRepository) GetByIdAds(ctx context.Context, id int) (models.Content, error) {
-    // 1) Контекст с таймаутом
+    // 1) Таймаут для БД
     dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
     defer cancel()
 
-    // 2) Переменные для объявления и автора
+    // 2) Переменные для результата
     var content models.Content
-    var author  models.User
+    var author models.User
 
-    // 3) Расширенный запрос, который отдаёт и поля из auth_users
+    // Промежуточные типы для nullable-колонок
+    var (
+        bankIDNull   sql.NullInt64
+        bankNameNull sql.NullString
+    )
+
+    // 3) Выполняем запрос (с учётом LEFT JOIN на banks)
     err := c.db.QueryRowContext(dbCtx, getByIdAdsQuery, id).Scan(
-        // поля объявления
+        // Поля объявления:
         &content.Id,
         &content.Title,
         &content.NameAppartment,
@@ -275,9 +276,11 @@ func (c *ContentRepository) GetByIdAds(ctx context.Context, id int) (models.Cont
         &content.StopedAt,
         &content.City,
         &content.District,
-
-        // поля автора (models.User)
-       	&author.ID,
+        &content.Pledge,
+        &bankIDNull,
+        &bankNameNull,
+        // Поля автора:
+        &author.ID,
         &author.Login,
         &author.Name,
         &author.CreatedAt,
@@ -287,12 +290,27 @@ func (c *ContentRepository) GetByIdAds(ctx context.Context, id int) (models.Cont
         return models.Content{}, err
     }
 
-     content.Author = author
+    // 4) Переносим автора
+    content.Author = author
 
-    // подтягиваем фото
+    // 5) Обрабатываем nullable bank_id
+    if bankIDNull.Valid {
+        content.BankID = int(bankIDNull.Int64)
+    } else {
+        content.BankID = 0
+    }
+
+    // 6) Обрабатываем nullable bank_name
+    if bankNameNull.Valid {
+        content.BankName = bankNameNull.String
+    } else {
+        content.BankName = ""
+    }
+
+    // 7) Загружаем все фото (обычная логика)
     rows, err := c.db.QueryContext(dbCtx, getPhotosByIdQuery, content.Id)
     if err != nil {
-        zap.L().Error("ошибка получения фото", zap.Error(err))
+        zap.L().Error("error fetching photos", zap.Error(err))
         return models.Content{}, err
     }
     defer rows.Close()
@@ -1158,4 +1176,66 @@ func (c *ContentRepository) GetConfirmationOfUser(ctx context.Context, userId in
 		sales = append(sales, sale)
 	}
 	return sales, nil
+}
+
+func (c *ContentRepository) GetSalesBySeller(ctx context.Context, sellerId int) ([]models.Sales, error) {
+    dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+    defer cancel()
+
+    // Выполняем SQL-запрос, объявленный в query.go
+    rows, err := c.db.QueryContext(dbCtx, getSalesBySellerQuery, sellerId)
+    if err != nil {
+        zap.L().Error("Failed to query sales by seller", zap.Error(err))
+        return nil, err
+    }
+    defer rows.Close()
+
+    var salesList []models.Sales
+    for rows.Next() {
+        var sale models.Sales
+        // Здесь нужно убедиться, что поля модели совпадают с порядком SELECT
+        err := rows.Scan(
+            &sale.Id,                       // s.id
+            &sale.IdAds,                    // s.id_ads
+            &sale.BuyerId.Id,               // buyer.id   AS buyer_id
+            &sale.BuyerId.Name,             // buyer.name AS buyer_name
+            &sale.SellerId.Id,              // s.seller_id
+            &sale.StatusPurchase,           // s.status_purchase
+            &sale.PurchaseAmount,           // s.purchase_amount
+            &sale.ConfirmedAt,              // s.confirmation_waiting_date
+            &sale.PurchaseCancelled,        // s.purchase_canceled
+            &sale.PricewWithService,        // s.price_with_service
+        )
+        if err != nil {
+            zap.L().Error("Failed to scan row for GetSalesBySeller", zap.Error(err))
+            continue
+        }
+        salesList = append(salesList, sale)
+    }
+
+    return salesList, nil
+}
+
+func (c *ContentRepository) GetBanks(ctx context.Context) ([]models.Bank, error) {
+    // Берём контекст с таймаутом (при желании можно параметризовать)
+    dbCtx, cancel := context.WithTimeout(ctx, common.TimeDbContext)
+    defer cancel()
+
+    rows, err := c.db.QueryContext(dbCtx, getBanksQuery)
+    if err != nil {
+        zap.L().Error("error getting banks", zap.Error(err))
+        return nil, err
+    }
+    defer rows.Close()
+
+    var banks []models.Bank
+    for rows.Next() {
+        var b models.Bank
+        if err := rows.Scan(&b.ID, &b.Name); err != nil {
+            zap.L().Error("error scanning bank row", zap.Error(err))
+           	continue
+        }
+        banks = append(banks, b)
+    }
+    return banks, nil
 }

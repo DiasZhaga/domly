@@ -27,7 +27,8 @@ type Content struct {
 	City                  string                `form:"city" json:"city"`
 	District              string                `form:"district" json:"district"`
 	Pledge             	  bool     				`form:"pledge" json:"pledge,omitempty"`   // теперь bool
-	BankID             	  int      				`form:"bank_id" json:"bank_id,omitempty"` // теперь int
+	BankID 				  int  					`form:"bank_id" json:"bank_id,omitempty"`
+	BankName              string                `json:"bank_name,omitempty"`
 	DescriptionAppartment DescriptionAppartment `json:"description_appartment,omitempty"`
 	Author   User   `json:"author,omitempty"`
 }
@@ -84,6 +85,13 @@ type District struct {
   CityID int    `json:"city_id"`
   Name   string `json:"name"`
 }
+
+
+type Bank struct {
+    ID   int    `json:"id"`
+    Name string `json:"name"`
+}
+
 
 type Apartment struct {
     ID              string   `json:"id"`

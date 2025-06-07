@@ -1,3 +1,5 @@
+// src/components/Navbar.js
+
 import React, { useState } from "react";
 import { NavLink, Link } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
@@ -71,14 +73,19 @@ const Navbar = () => {
                       Buy Property
                     </NavLink>
                   </li>
-                  <li>
-                    <NavLink to="/sell-property" className="dropdown-item">
-                      Sell Property
-                    </NavLink>
-                  </li>
+
+                  {/* SHOW 'Sell Property' ONLY if user IS LOGGED IN */}
+                  {user && (
+                    <li>
+                      <NavLink to="/sell-property" className="dropdown-item">
+                        Sell Property
+                      </NavLink>
+                    </li>
+                  )}
                 </ul>
               </div>
 
+              {/* Если нет user, показываем кнопку Sign In */}
               {!user ? (
                 <button
                   onClick={() => setShowModal(true)}
@@ -88,7 +95,7 @@ const Navbar = () => {
                 </button>
               ) : (
                 <>
-                  {/* Add Funds in main navbar */}
+                  {/* Add Funds (видно только, когда user есть) */}
                   <button
                     onClick={() => setShowAddFunds(true)}
                     className="nav-item nav-link btn"
@@ -96,7 +103,7 @@ const Navbar = () => {
                     Add Funds
                   </button>
 
-                  {/* User dropdown */}
+                  {/* Дропдаун с меню пользователя */}
                   <div className="nav-item dropdown d-flex align-items-center">
                     <button
                       className="nav-link dropdown-toggle d-flex align-items-center"
@@ -150,7 +157,9 @@ const Navbar = () => {
       {showAddFunds && (
         <AddFundsModal
           onClose={() => setShowAddFunds(false)}
-          onSuccess={(added) => { /* refresh if needed */ }}
+          onSuccess={(added) => {
+            /* можно обновить баланс, если нужно */
+          }}
         />
       )}
     </>

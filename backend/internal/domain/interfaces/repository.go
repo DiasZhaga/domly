@@ -93,7 +93,10 @@ type ContentRepositoryI interface {
 	AddingBalance(ctx context.Context, userId int, amount float64) error
 	BuySubscribe(ctx context.Context, userId int, idSub string) error
 	BuyApartment(ctx context.Context, userId, apartmentId, sellerId int, sum float64) error
+	GetSalesBySeller(ctx context.Context, sellerId int) ([]models.Sales, error)
 
 	ProofOfPurchase(ctx context.Context, userId int, status string, salesId, sellerId int, sum float64) error
 	GetConfirmationOfUser(ctx context.Context, userId int) ([]models.Sales, error)
+
+	GetBanks(ctx context.Context) ([]models.Bank, error)
 }

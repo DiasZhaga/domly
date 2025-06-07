@@ -14,20 +14,60 @@ const PropertyDetails = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // ---------------------------------
+  // 1. Состояние для городов и районов
+  // ---------------------------------
+  const [citiesList, setCitiesList] = useState([]);
+  const [districtsList, setDistrictsList] = useState([]);
+
+  // ---------------------------------
+  // 2. Состояние для самого объявления
+  // ---------------------------------
   const [ad, setAd] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Модалки
+  // ---------------------------------
+  // 3. Состояние для модалок
+  // ---------------------------------
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoModalData, setInfoModalData] = useState({ title: "", message: "" });
   const [showAddFunds, setShowAddFunds] = useState(false);
 
-  // Загружаем данные объявления
+  const isGuest = !user;
+  const needsSubscription = user && !user.isSubscribed;
+
+  // ---------------------------------
+  // 4. Моковые комментарии
+  // ---------------------------------
+  const comments = [
+    {
+      id: 1,
+      author: "Erzhan Zhumagaliev",
+      text: "Very friendly community, everything is near by, supermarket, laundry mats. Pharmacy and playground. Buss to the subway",
+      time: "just now",
+    },
+  ];
+
+  // ---------------------------------
+  // 5. Загрузка списка городов
+  // ---------------------------------
   useEffect(() => {
-    (async () => {
+    fetch("/api/v1/locations/cities", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        setCitiesList(data);
+      })
+      .catch(console.error);
+  }, []);
+
+  // ---------------------------------
+  // 6. Загрузка самого объявления
+  // ---------------------------------
+  useEffect(() => {
+    const loadAd = async () => {
       setLoading(true);
       setError(null);
       try {
@@ -35,20 +75,39 @@ const PropertyDetails = () => {
           credentials: "include",
         });
         if (!res.ok) throw new Error(`Error: ${res.status}`);
-        setAd(await res.json());
+        const json = await res.json();
+        setAd(json);
       } catch (e) {
         setError(e);
       } finally {
         setLoading(false);
       }
-    })();
+    };
+
+    loadAd();
   }, [id]);
+
+  // ---------------------------------
+  // 7. Когда объявление загружено, подгружаем районы для его города
+  // ---------------------------------
+  useEffect(() => {
+    if (!ad || !ad.city) return;
+
+    fetch(`/api/v1/locations/districts?city_id=${ad.city}`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        setDistrictsList(data);
+      })
+      .catch(console.error);
+  }, [ad]);
 
   if (loading) return <p className="text-center py-5">Loading…</p>;
   if (error) return <p className="text-danger text-center py-5">{error.message}</p>;
   if (!ad) return <p className="text-center py-5">No data</p>;
 
-  // URL фотографий
+  // ---------------------------------
+  // 8. URL фотографий для PropertyGallery
+  // ---------------------------------
   const photoUrls = (ad.url_photos || []).map((p) =>
     p.url.startsWith("http") ? p.url : `/ads-photos/${p.url}`
   );
@@ -59,15 +118,30 @@ const PropertyDetails = () => {
     }
   };
 
-  // Основная функция: выполняем покупку
+  // ---------------------------------
+  // 9. Вычисляем читабельные имена города и района
+  // ---------------------------------
+  const cityName = (() => {
+    const cityIdNum = Number(ad.city);
+    const found = citiesList.find((c) => c.id === cityIdNum);
+    return found ? found.name : ad.city;
+  })();
+
+  const districtName = (() => {
+    const districtIdNum = Number(ad.district);
+    const found = districtsList.find((d) => d.id === districtIdNum);
+    return found ? found.name : ad.district;
+  })();
+
+  // ---------------------------------
+  // 10. Функция покупки
+  // ---------------------------------
   const performPurchase = async () => {
-    // 1) Проверяем авторизацию
     if (!user) {
       setShowAuthModal(true);
       return;
     }
 
-    // 2) Составляем параметры
     const apartmentId = ad.id;
     const sellerId = ad.author.id;
     const sum = ad.price;
@@ -82,7 +156,6 @@ const PropertyDetails = () => {
       );
 
       if (res.ok) {
-        // Успешный запрос: показываем информационную модалку и перенаправляем
         setInfoModalData({
           title: "Purchase Initiated",
           message:
@@ -92,7 +165,6 @@ const PropertyDetails = () => {
       } else {
         const body = await res.json().catch(() => ({}));
         if (res.status === 400 && body.error === "not enough money") {
-          // Недостаточно средств → открываем модалку пополнения
           setShowAddFunds(true);
         } else {
           setInfoModalData({
@@ -131,9 +203,20 @@ const PropertyDetails = () => {
                   ₸{Number(ad.price).toLocaleString("ru-RU")}
                 </h3>
                 <p>
-                  <strong>Address:</strong> {ad.address}, {ad.city}, {ad.district}
+                  <strong>Address:</strong> {ad.address}, <em>{cityName}</em>, <em>{districtName}</em>
                 </p>
                 <hr />
+
+                {/* Статус «в залоге» */}
+                <p>
+                  <strong>In pledge:</strong>{" "}
+                  {ad.pledge ? (
+                    <span className="text-danger">{ad.bank_name || "—"}</span>
+                  ) : (
+                    <span>No</span>
+                  )}
+                </p>
+
                 <div className="row">
                   <div className="col-sm-6">
                     <p>
@@ -200,7 +283,64 @@ const PropertyDetails = () => {
                 <p style={{ lineHeight: 1.7 }}>{ad.description}</p>
 
                 <h4 className="mt-4">Comments</h4>
-                {/* ... остальной код комментариев без изменений ... */}
+                {(!isGuest && !needsSubscription) ? (
+                  <div className="comments-normal">
+                    <textarea
+                      className="form-control mb-3"
+                      placeholder="Add comment..."
+                      rows={3}
+                    />
+                    {comments.map((c) => (
+                      <div key={c.id} className="mb-3">
+                        <strong>{c.author}</strong> <small className="text-muted">{c.time}</small>
+                        <p className="mb-1">{c.text}</p>
+                        <hr />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="blurred-box">
+                    <div className="blurred-text">
+                      <textarea
+                        className="form-control mb-3"
+                        placeholder="Add comment..."
+                        rows={3}
+                        disabled
+                      />
+                      {comments.map((c) => (
+                        <div key={c.id} className="mb-3">
+                          <strong>{c.author}</strong> <small className="text-muted">{c.time}</small>
+                          <p className="mb-1">{c.text}</p>
+                          <hr />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="overlay-message">
+                      {isGuest && (
+                        <>
+                          <p className="mb-3">Please register to view and add comments.</p>
+                          <button
+                            className="btn btn-success"
+                            onClick={() => setShowAuthModal(true)}
+                          >
+                            Register
+                          </button>
+                        </>
+                      )}
+                      {needsSubscription && (
+                        <>
+                          <p className="mb-3">Purchase a subscription to see comments.</p>
+                          <button
+                            className="btn btn-success"
+                            onClick={() => navigate("/subscribe")}
+                          >
+                            Buy Premium
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -216,7 +356,7 @@ const PropertyDetails = () => {
       {showConfirmModal && (
         <ConfirmModal
           title="Are you sure you want to make this purchase?"
-          message="To complete this transaction, you have three days to finalize all required paperwork and register the property ownership. After that, please return to our platform and confirm the purchase so the funds can be released to the seller. If you cancel, the full amount will be refunded to your account."
+          message="To complete this transaction, you have three days to finalize all required paperwork and register the property ownership. After that, please return to our platform and confirm the purchase so the funds can be released to the seller. If you cancel, the full amount will be refunded to your account. You can confirm or cancel on Account&Payments page."
           confirmLabel="Confirm Purchase"
           cancelLabel="Cancel"
           onCancel={() => setShowConfirmModal(false)}
@@ -234,9 +374,8 @@ const PropertyDetails = () => {
           message={infoModalData.message}
           onClose={() => {
             setShowInfoModal(false);
-            // если покупка была успешна, редиректим на /purchase-confirmation
             if (infoModalData.title === "Purchase Initiated") {
-              navigate("/purchase-confirmation");
+              navigate("/account-payments");
             }
           }}
         />
@@ -247,10 +386,7 @@ const PropertyDetails = () => {
         <AddFundsModal
           userId={user.id}
           onSuccess={(newBalance, isSubscribed) => {
-            // апдейтим контекст user, если нужно:
-            if (typeof newBalance === "number") {
-              // ... предполагается, что у вас setUser(...) доступен через useAuth ...
-            }
+            // при необходимости можно обновить контекст user
             setShowAddFunds(false);
           }}
           onError={(msg) => {

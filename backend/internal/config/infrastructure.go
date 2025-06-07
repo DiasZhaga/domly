@@ -12,5 +12,6 @@ type MinioConf struct {
 	Endpoint  string `json:"endpoint"`
 	AccessKey string `json:"username"`
 	SecretKey string `json:"password"`
-	Bucket    string `json:"bucket"`
+	BucketPhotos    string `json:"bucket_photos"`
+    BucketDocuments string `json:"bucket_documents"`
 }

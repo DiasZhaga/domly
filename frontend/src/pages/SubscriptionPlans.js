@@ -5,6 +5,7 @@ import Layout from "../components/Layout";
 import { useAuth } from "../components/AuthContext";
 import { FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 
+// Настройка плана (остается без изменений)
 const plans = [
   {
     key: "plus",
@@ -32,11 +33,11 @@ const SubscriptionPlans = () => {
   // Флаг, что идёт запрос на покупку (блокирует кнопки)
   const [loadingPlan, setLoadingPlan] = useState(false);
 
-  // Управление модалкой:
+  // Управление модалкой подтверждения:
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
 
-  // 1) Пока идёт fetch("/api/v1/auth/me"), показываем «Loading…»
+  // 1) Пока идёт загрузка user (fetch("/api/v1/auth/me")), показываем «Loading…»
   if (loading) {
     return (
       <Layout>
@@ -47,19 +48,17 @@ const SubscriptionPlans = () => {
     );
   }
 
-  // 2) Если пользователь не залогинен – попросим зайти
-  if (!user) {
-    return (
-      <Layout>
-        <div className="container py-5 text-center">
-          <h4>Please log in to view subscription plans.</h4>
-        </div>
-      </Layout>
-    );
-  }
+  // 2) Если пользователь не залогинен – показываем план, но покупку блокируем
+  //    (мы убираем прежний return, и вообще рендерим всё окно для всех).
+  //    Кнопки «Subscribe» будут неактивны и показывать сообщение «Log in to buy».
 
   // 3) Открыть модалку подтверждения для конкретного плана
   const openConfirmModal = (plan) => {
+    if (!user) {
+      // незалогиненный – нельзя купить, покажем краткую ошибку
+      setError("Please log in to purchase a subscription.");
+      return;
+    }
     setError("");
     setSuccess("");
     setSelectedPlan(plan);
@@ -80,37 +79,31 @@ const SubscriptionPlans = () => {
         credentials: "include",
       });
       if (!res.ok) {
-        // Если сервер вернул 400/500 с JSON { error: "..." }
         const body = await res.json().catch(() => ({}));
         const msg = body.error || `Server returned ${res.status}`;
         throw new Error(msg);
       }
 
       const updatedUser = await res.json();
-      // Обновляем контекст пользователя (новый баланс, статус подписки)
+      // Обновляем контекст пользователя (баланс/статус подписки)
       setUser(updatedUser);
 
-      // Показываем зелёный alert
-      setSuccess("Purchased successfully");
-      // Мы не делаем navigate("/account-payments"). Просто оставляем пользователя здесь.
+      setSuccess("Subscription purchased successfully.");
 
-      // После небольшого таймаута можно автоматически закрыть модалку,
-      // либо оставить её открытой, но показать только сообщение об успехе.
-      // В этом примере мы оставим её открытой на 1 секунду, а затем закроем:
+      // Закрываем модалку через 1 секунду
       setTimeout(() => {
         setShowConfirm(false);
         setSelectedPlan(null);
       }, 1000);
     } catch (err) {
       console.error(err);
-      // Показываем красный alert
-      setError(err.message || "Purchase failed");
+      setError(err.message || "Purchase failed.");
     } finally {
       setLoadingPlan(false);
     }
   };
 
-  // 5) Отмена покупки: просто закрыть модалку и сбросить состояния
+  // 5) Отмена покупки
   const cancelPurchase = () => {
     setShowConfirm(false);
     setSelectedPlan(null);
@@ -140,59 +133,66 @@ const SubscriptionPlans = () => {
           )}
 
           <div className="row g-4">
-            {plans.map((plan) => (
-              <div className="col-md-6" key={plan.key}>
-                <div className="card h-100 shadow-sm">
-                  <div className="card-body d-flex flex-column">
-                    <h5 className="card-title text-center">{plan.name}</h5>
-                    <h3 className="text-success text-center mb-3">
-                      ₸{plan.price.toLocaleString("en-US")}
-                      <small className="text-muted"> / {plan.period}</small>
-                    </h3>
+            {plans.map((plan) => {
+              // если пользователь не залогинен, кнопка будет disabled и при клике выводится «Please log in…»
+              const isDisabled = loadingPlan || !user;
 
-                    <ul className="list-unstyled mb-4">
-                      {plan.name === "Domly Plus" ? (
-                        <>
-                          <li className="mb-2">
-                            <i className="fa fa-check me-2" />
-                            View “What Locals Say” comments
-                          </li>
-                          <li className="mb-2">
-                            <i className="fa fa-check me-2" />
-                            Developer consultations
-                          </li>
-                          <li className="mb-2">
-                            <i className="fa fa-check me-2" />
-                            Your ads always appear at the top
-                          </li>
-                        </>
-                      ) : (
-                        <>
-                          <li className="mb-2">
-                            <i className="fa fa-check me-2" />
-                            All features of Domly Plus
-                          </li>
-                          <li className="mb-2">
-                            <i className="fa fa-check me-2" />
-                            Save ~38% vs. monthly plan
-                          </li>
-                        </>
-                      )}
-                    </ul>
+              return (
+                <div className="col-md-6" key={plan.key}>
+                  <div className="card h-100 shadow-sm">
+                    <div className="card-body d-flex flex-column">
+                      <h5 className="card-title text-center">{plan.name}</h5>
+                      <h3 className="text-success text-center mb-3">
+                        ₸{plan.price.toLocaleString("en-US")}
+                        <small className="text-muted"> / {plan.period}</small>
+                      </h3>
 
-                    <button
-                      className="btn btn-success mt-auto"
-                      onClick={() => openConfirmModal(plan)}
-                      disabled={loadingPlan}
-                    >
-                      {loadingPlan && selectedPlan?.id === plan.id
-                        ? "Processing..."
-                        : `Subscribe to ${plan.name}`}
-                    </button>
+                      <ul className="list-unstyled mb-4">
+                        {plan.name === "Domly Plus" ? (
+                          <>
+                            <li className="mb-2">
+                              <i className="fa fa-check me-2" />
+                              View “What Locals Say” comments
+                            </li>
+                            <li className="mb-2">
+                              <i className="fa fa-check me-2" />
+                              Developer consultations
+                            </li>
+                            <li className="mb-2">
+                              <i className="fa fa-check me-2" />
+                              Your ads always appear at the top
+                            </li>
+                          </>
+                        ) : (
+                          <>
+                            <li className="mb-2">
+                              <i className="fa fa-check me-2" />
+                              All features of Domly Plus
+                            </li>
+                            <li className="mb-2">
+                              <i className="fa fa-check me-2" />
+                              Save ~38% vs. monthly plan
+                            </li>
+                          </>
+                        )}
+                      </ul>
+
+                      <button
+                        className="btn btn-success mt-auto"
+                        onClick={() => openConfirmModal(plan)}
+                        disabled={isDisabled}
+                      >
+                        {loadingPlan && selectedPlan?.id === plan.id
+                          ? "Processing..."
+                          : !user
+                          ? "Log in to subscribe"
+                          : `Subscribe to ${plan.name}`}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="mt-5 p-4 bg-white rounded shadow-sm">
@@ -231,7 +231,7 @@ const SubscriptionPlans = () => {
               {` for ₸${selectedPlan.price.toLocaleString("en-US")}?`}
             </p>
 
-            {/* Повторим сообщения внутри модалки (если нужно): */}
+            {/* Повторим сообщения внутри модалки (если нужно) */}
             {error && (
               <div className="alert alert-danger d-flex align-items-center">
                 <FaTimesCircle className="me-2" />
