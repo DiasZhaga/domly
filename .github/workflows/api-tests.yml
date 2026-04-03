@@ -1,0 +1,45 @@
+name: API Quality Gates
+
+on:
+  push:
+    branches: [ "tests" ]
+  pull_request:
+    branches: [ "tests" ]
+
+jobs:
+  automated-api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js (for Newman)
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Newman CLI
+        run: npm install -g newman
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.26.1'
+
+      - name: Start Infrastructure (PostgreSQL, MinIO)
+        run: docker compose -f backend/docker-compose.yml up -d
+
+      - name: Start Go Backend in Background
+        working-directory: ./backend
+        run: |
+          go mod download
+          go build -o domly_server cmd/main.go
+          ./domly_server > server.log 2>&1 &
+          sleep 5
+          cat server.log
+
+      - name: Run Auth & Security Tests (QG01)
+        run: newman run tests/api/domly_api_tests.json
+
+      - name: Run Content & Ads Tests (QG02)
+        run: newman run tests/api/file_management_tests.json --bail
