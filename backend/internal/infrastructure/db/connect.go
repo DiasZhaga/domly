@@ -9,7 +9,14 @@ import (
 )
 
 func NewConnect(cfg *config.DbConf) (*sql.DB, error) {
-	dbSql := fmt.Sprintf("host=%s  user=%s dbname=%s password=%s sslmode=disable", cfg.Host, cfg.User, cfg.Name, cfg.Pass)
+	dbSql := fmt.Sprintf(
+		"host=%s port=%s user=%s dbname=%s password=%s sslmode=disable",
+		cfg.Host,
+		cfg.Port,
+		cfg.User,
+		cfg.Name,
+		cfg.Pass,
+	)
 	db, err := sql.Open("postgres", dbSql)
 	if err != nil {
 		return nil, err
