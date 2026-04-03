@@ -1,0 +1,114 @@
+{
+    "info": {
+        "_postman_id": "c684c948-7091-4fa4-8e3b-0d239b0dd45b",
+        "name": "Domly-API-Tests",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_exporter_id": "31657850"
+    },
+    "item": [
+        {
+            "name": "Valid Login",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"Status code is 200 OK\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});",
+                            "pm.test(\"Response time is acceptable (under 500ms)\", function () {",
+                            "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "formdata",
+                    "formdata": [
+                        {
+                            "key": "login",
+                            "value": "zhalgas.karsenbai@gmail.com",
+                            "type": "text"
+                        },
+                        {
+                            "key": "password",
+                            "value": "20052003Zha@",
+                            "type": "text"
+                        }
+                    ]
+                },
+                "url": {
+                    "raw": "http://localhost:8080/api/v1/auth/login",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "8080",
+                    "path": [
+                        "api",
+                        "v1",
+                        "auth",
+                        "login"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Invalid Login",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"Status code is strictly 401 Unauthorized\", function () {",
+                            "    pm.response.to.have.status(401);",
+                            "});",
+                            "pm.test(\"System fails gracefully (No 500 Internal Error)\", function () {",
+                            "    pm.response.to.not.have.status(500);",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "formdata",
+                    "formdata": [
+                        {
+                            "key": "login",
+                            "value": "123",
+                            "type": "text"
+                        },
+                        {
+                            "key": "password",
+                            "value": "123",
+                            "type": "text"
+                        }
+                    ]
+                },
+                "url": {
+                    "raw": "http://localhost:8080/api/v1/auth/login",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "8080",
+                    "path": [
+                        "api",
+                        "v1",
+                        "auth",
+                        "login"
+                    ]
+                }
+            }
+        }
+    ]
+}

@@ -111,3 +111,5 @@ VALUES
   'sales@ulytau.kz',
   'https://example.com/logos/ulytau.png'
 );
+
+SELECT setval('auth_users_id_seq', (SELECT MAX(id) FROM public.auth_users));

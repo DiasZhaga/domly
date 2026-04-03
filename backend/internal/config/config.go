@@ -13,12 +13,12 @@ var (
 )
 
 type Config struct {
-	App   *AppConf   `json:"APP"`
-	Cors  *CorsConf  `json:"CORS"`
-	Db    *DbConf    `json:"DB"`
-	Minio *MinioConf `json:"MINIO"`
-	StripeSecretKey     string `json:"STRIPE_SECRET_KEY"`     // sk_test_…
-	StripeWebhookSecret string `json:"STRIPE_WEBHOOK_SECRET"` // whsec_…
+	App                 *AppConf   `json:"APP"`
+	Cors                *CorsConf  `json:"CORS"`
+	Db                  *DbConf    `json:"DB"`
+	Minio               *MinioConf `json:"MINIO"`
+	StripeSecretKey     string     `json:"STRIPE_SECRET_KEY"` // sk_test_…
+	StripeWebhookSecret string     `json:"STRIPE_WEBHOOK_SECRET"`                                                                                       // whsec_…
 }
 
 func GetConfig() *Config {

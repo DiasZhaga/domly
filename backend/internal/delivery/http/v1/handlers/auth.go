@@ -89,16 +89,27 @@ func (h *Handler) Login(c *gin.Context) {
 	login := c.Request.FormValue("login")
 	password := c.Request.FormValue("password")
 
+	if login == "" || password == "" {
+		zap.L().Error("user login data is empty")
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Логин или пароль не указаны. Пожалуйста, убедитесь, что вы отправляете запрос как form-data (не raw JSON)."})
+		return
+	}
+
 	// 1) Получаем id и сохранённый пароль
 	id, savedPass, err := h.majorRepository.GetPassInDb(ctx, login)
 	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			zap.L().Warn("user not found", zap.String("login", login))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Неверный логин или пароль"})
+			return
+		}
 		zap.L().Error("get user data failed", zap.Error(err))
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{})
 		return
 	}
 	if savedPass != password {
 		zap.L().Error("password is invalid")
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Неверный логин или пароль"})
 		return
 	}
 
