@@ -1,0 +1,34 @@
+name: API Quality Gates
+
+on:
+  push:
+    branches: ["tests"]
+  pull_request:
+    branches: ["tests"]
+
+jobs:
+  automated-api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js (for Newman)
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install Newman CLI
+        run: npm install -g newman
+
+      - name: Start Infrastructure (PostgreSQL, MinIO, Go Backend)
+        run: docker-compose up -d --build
+
+      - name: Wait for API to be ready
+        run: sleep 15
+
+      - name: Run Auth & Security Tests (QG01)
+        run: newman run tests/api/domly_api_tests.json
+
+      - name: Run Content & Ads Tests (QG02)
+        run: newman run tests/api/file_management_tests.json --bail
